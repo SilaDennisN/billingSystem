@@ -1,0 +1,12 @@
+RewriteEngine On
+
+# Prevent directory listing
+Options -Indexes
+
+# Allow access to existing files and folders
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Remove .php extension
+RewriteRule ^(.+)$ $1.php [L,QSA]

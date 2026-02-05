@@ -1,0 +1,504 @@
+<?php
+date_default_timezone_set('Africa/Nairobi');
+session_start();
+
+require_once "../core/db.php";
+require_once "../core/router.php";
+require_once "error_handler.php";  // Include error handler
+
+use RouterOS\Query;
+
+/* =========================
+   Validate hotspot access
+========================= */
+
+if (!isset($_POST['mac'], $_POST['link-login-only'])) {
+    showError(
+        'access',
+        'Invalid Hotspot Access',
+        'It looks like you didn\'t connect through the hotspot login page. Please connect to our WiFi network and try accessing the internet again.',
+        [
+            ['text' => '📶 Connect to WiFi', 'link' => 'wifi://'],
+            ['text' => '🔄 Refresh Page', 'link' => 'javascript:location.reload()']
+        ]
+    );
+}
+
+/* =========================
+   Store hotspot vars
+========================= */
+$_SESSION['mac']             = $_POST['mac'];
+$_SESSION['ip']              = $_POST['ip'] ?? null;
+$_SESSION['link-login']      = $_POST['link-login'] ?? null;
+$_SESSION['link-login-only'] = $_POST['link-login-only'];
+
+$mac             = $_SESSION['mac'];
+$link_login_only = $_SESSION['link-login-only'];
+$linkorig        = "https://www.google.com";
+
+/* =========================
+   Router identity (STATIC)
+========================= */
+$routerIdentity = "MikroTik";
+
+/* =========================
+   Load router
+========================= */
+try {
+    $stmt = $pdo->prepare("SELECT * FROM routers WHERE identity=?");
+    $stmt->execute([$routerIdentity]);
+    $router = $stmt->fetch();
+
+    if (!$router) {
+        showError(
+            'database',
+            'Router Not Recognized',
+            'We couldn\'t find the router configuration in our system. This might be a setup issue. Please contact the network administrator.',
+            [
+                ['text' => '🔄 Try Again', 'link' => 'javascript:location.reload()'],
+                ['text' => '📞 Contact Support', 'link' => 'mailto:support@inovatech.com']
+            ]
+        );
+    }
+} catch (Exception $e) {
+    showError(
+        'database',
+        'Database Connection Failed',
+        'We\'re having trouble connecting to our database. Please try again in a moment. If the problem persists, contact support.',
+        [
+            ['text' => '🔄 Retry', 'link' => 'javascript:location.reload()'],
+            ['text' => '← Go Back', 'link' => 'javascript:history.back()']
+        ]
+    );
+}
+
+/* =========================
+   Connect to MikroTik
+========================= */
+try {
+    $client = router_connect($router['router_id']);
+    if (!$client) {
+        showError(
+            'connection',
+            'Router Connection Failed',
+            'We couldn\'t establish a connection to the network router. This is usually temporary. Please wait a moment and try again.',
+            [
+                ['text' => '🔄 Retry Connection', 'link' => 'javascript:location.reload()'],
+                ['text' => '📞 Report Issue', 'link' => 'mailto:support@inovatech.com?subject=Router Connection Failed']
+            ]
+        );
+    }
+} catch (Exception $e) {
+    showError(
+        'network',
+        'Network Communication Error',
+        'There was an error communicating with the router. The network might be experiencing issues. Please try again shortly.',
+        [
+            ['text' => '🔄 Try Again', 'link' => 'javascript:location.reload()'],
+            ['text' => '← Back', 'link' => 'javascript:history.back()']
+        ]
+    );
+}
+
+/* =========================
+   Build username
+========================= */
+$username = 'mac_' . str_replace(':', '', $mac);
+$password = '123456';
+
+/* =========================
+   Check if user exists
+========================= */
+try {
+    $query = new Query('/ip/hotspot/user/print');
+    $query->where('name', $username);
+    $user = $client->query($query)->read();
+} catch (Exception $e) {
+    showError(
+        'network',
+        'Unable to Check User Status',
+        'We encountered an error while checking your account status. Please try refreshing the page.',
+        [
+            ['text' => '🔄 Refresh', 'link' => 'javascript:location.reload()'],
+            ['text' => '← Back', 'link' => 'javascript:history.back()']
+        ]
+    );
+}
+
+/* =========================
+   If user exists, check time
+========================= */
+if (!empty($user)) {
+    $limit = $user[0]['limit-uptime'] ?? null;
+    $used  = $user[0]['uptime'] ?? '0s';
+
+    // If limit exists and NOT fully used → AUTO LOGIN
+    if ($limit && $used !== $limit) {
+?>
+        <!DOCTYPE html>
+        <html>
+
+        <head>
+            <meta charset="utf-8">
+            <title>Connecting...</title>
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    text-align: center;
+                }
+
+                .reconnect-container {
+                    background: rgba(255, 255, 255, 0.1);
+                    backdrop-filter: blur(10px);
+                    padding: 40px;
+                    border-radius: 20px;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                }
+
+                .spinner {
+                    width: 50px;
+                    height: 50px;
+                    margin: 0 auto 20px;
+                    border: 4px solid rgba(255, 255, 255, 0.3);
+                    border-top: 4px solid white;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                }
+
+                @keyframes spin {
+                    0% {
+                        transform: rotate(0deg);
+                    }
+
+                    100% {
+                        transform: rotate(360deg);
+                    }
+                }
+
+                h2 {
+                    margin: 0 0 10px;
+                    font-size: 24px;
+                }
+
+                p {
+                    margin: 0;
+                    opacity: 0.9;
+                }
+            </style>
+        </head>
+
+        <body onload="document.login.submit()">
+
+            <div class="reconnect-container">
+                <div class="spinner"></div>
+                <h2>Welcome Back!</h2>
+                <p>Reconnecting you to the internet...</p>
+            </div>
+
+            <form name="login" method="post" action="<?= htmlspecialchars($link_login_only) ?>">
+                <input type="hidden" name="username" value="<?= htmlspecialchars($username) ?>">
+                <input type="hidden" name="password" value="<?= htmlspecialchars($password) ?>">
+                <input type="hidden" name="dst" value="<?= htmlspecialchars($linkorig) ?>">
+            </form>
+
+        </body>
+
+        </html>
+<?php
+        exit;
+    }
+
+    // Time expired → remove user
+    try {
+        $client->query(
+            (new Query('/ip/hotspot/user/remove'))
+                ->equal('name', $username)
+        )->read();
+    } catch (Exception $e) {
+        // Silent fail - continue to show plans
+    }
+}
+
+/* =========================
+   Load available plans
+========================= */
+try {
+    $stmt = $pdo->prepare("
+        SELECT * FROM hotspot_profiles
+WHERE router_id=? 
+AND plan_type='hotspot'
+ORDER BY CAST(price AS UNSIGNED) ASC;
+
+    ");
+    $stmt->execute([$router['router_id']]);
+    $plans = $stmt->fetchAll();
+
+    if (empty($plans)) {
+        showError(
+            'general',
+            'No Plans Available',
+            'There are currently no internet packages available for purchase. Please contact the administrator or try again later.',
+            [
+                ['text' => '🔄 Refresh', 'link' => 'javascript:location.reload()'],
+                ['text' => '📞 Contact Admin', 'link' => 'mailto:support@inovatech.com']
+            ]
+        );
+    }
+} catch (Exception $e) {
+    showError(
+        'database',
+        'Unable to Load Plans',
+        'We couldn\'t retrieve the available internet packages. Please try refreshing the page.',
+        [
+            ['text' => '🔄 Refresh Page', 'link' => 'javascript:location.reload()'],
+            ['text' => '← Go Back', 'link' => 'javascript:history.back()']
+        ]
+    );
+}
+?>
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Select Package</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="card">
+            <h2>📶 Choose Internet Package</h2>
+            <p class="subtitle">Buy a plan to continue</p>
+
+            <div class="plans">
+                <?php foreach ($plans as $plan): ?>
+                    <div class="plan" onclick="openPaymentModal(<?= htmlspecialchars(json_encode($plan)) ?>, <?= $router['router_id'] ?>)">
+                        <h3><?= htmlspecialchars($plan['profile_name']) ?></h3>
+                        <p class="price">KES <?= number_format($plan['price'], 2) ?></p>
+
+                        <?php if ($plan['validity_hours']): ?>
+                            <p class="validity"><?= $plan['validity_hours'] ?> hour(s)</p>
+                        <?php elseif ($plan['validity_days']): ?>
+                            <p class="validity"><?= $plan['validity_days'] ?> day(s)</p>
+                        <?php endif; ?>
+
+                        <button type="button">Buy Now</button>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+
+        <p class="footer">Powered by Inovatech Hotspot</p>
+    </div>
+
+    <!-- Payment Modal -->
+    <div id="paymentModal" class="modal">
+        <div class="modal-overlay" onclick="closePaymentModal()"></div>
+        <div class="modal-content">
+            <button class="modal-close" onclick="closePaymentModal()">&times;</button>
+
+            <div id="paymentForm">
+                <div class="modal-header">
+                    <h2>💳 Complete Payment</h2>
+                    <p id="modalPlanName" class="modal-subtitle"></p>
+                    <p id="modalAmount" class="modal-amount"></p>
+                </div>
+
+                <form id="stkForm" onsubmit="sendSTK(event)">
+                    <div class="form-group">
+                        <label for="phoneInput">M-Pesa Phone Number</label>
+                        <input
+                            type="tel"
+                            id="phoneInput"
+                            name="phone"
+                            placeholder="07XXXXXXXX or 2547XXXXXXXX"
+                            required
+                            pattern="^(07|01|2547|2541)[0-9]{8}$">
+                        <small>Enter your Safaricom number</small>
+                    </div>
+
+                    <button type="submit" class="btn-pay" id="payBtn">
+                        <span>Send Payment Request</span>
+                    </button>
+                </form>
+            </div>
+
+            <div id="loadingState" style="display: none;">
+                <div class="loading-container">
+                    <div class="spinner"></div>
+                    <h3>Processing Payment...</h3>
+                    <p class="loading-text">Initiating M-Pesa request</p>
+                </div>
+            </div>
+
+            <div id="stkWaiting" style="display: none;">
+                <div class="stk-container">
+                    <div class="phone-animation">
+                        <div class="phone-icon">📱</div>
+                        <div class="pulse-ring"></div>
+                    </div>
+                    <h3>📲 STK Push Sent!</h3>
+                    <p class="stk-text">Check your phone and enter your M-Pesa PIN</p>
+                    <div class="waiting-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <p class="stk-subtext">Waiting for payment confirmation...</p>
+                </div>
+            </div>
+
+            <div id="successState" style="display: none;">
+                <div class="success-container">
+                    <div class="success-icon">✓</div>
+                    <h3>Payment Successful!</h3>
+                    <p>Connecting you to the internet...</p>
+                </div>
+            </div>
+
+            <div id="errorState" style="display: none;">
+                <div class="error-container">
+                    <div class="error-icon">✗</div>
+                    <h3>Payment Failed</h3>
+                    <p id="errorMessage"></p>
+                    <button onclick="resetModal()" class="btn-retry">Try Again</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedPlan = null;
+        let selectedRouterId = null;
+        let paymentToken = null;
+        let checkInterval = null;
+
+        function openPaymentModal(plan, routerId) {
+            selectedPlan = plan;
+            selectedRouterId = routerId;
+
+            document.getElementById('modalPlanName').textContent = plan.profile_name;
+            document.getElementById('modalAmount').textContent = `KES ${parseFloat(plan.price).toFixed(2)}`;
+            document.getElementById('paymentModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closePaymentModal() {
+            document.getElementById('paymentModal').classList.remove('active');
+            document.body.style.overflow = '';
+            resetModal();
+            if (checkInterval) {
+                clearInterval(checkInterval);
+            }
+        }
+
+        function resetModal() {
+            document.getElementById('paymentForm').style.display = 'block';
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('stkWaiting').style.display = 'none';
+            document.getElementById('successState').style.display = 'none';
+            document.getElementById('errorState').style.display = 'none';
+            document.getElementById('stkForm').reset();
+        }
+
+        async function sendSTK(event) {
+            event.preventDefault();
+
+            const phone = document.getElementById('phoneInput').value;
+            const payBtn = document.getElementById('payBtn');
+
+            // Show loading state
+            document.getElementById('paymentForm').style.display = 'none';
+            document.getElementById('loadingState').style.display = 'block';
+
+            try {
+                // First, initiate payment to get token
+                const initiateResponse = await fetch('initiate_payment.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `router_id=${selectedRouterId}&plan_id=${selectedPlan.id}`
+                });
+
+                const initiateData = await initiateResponse.text();
+
+                // Small delay for loading effect
+                await new Promise(resolve => setTimeout(resolve, 800));
+
+                // Now send STK
+                const stkResponse = await fetch('pay.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `phone=${encodeURIComponent(phone)}`
+                });
+
+                const stkResult = await stkResponse.text();
+
+                if (stkResult.includes('Failed') || stkResult.includes('Invalid') || stkResult.includes('expired')) {
+                    throw new Error(stkResult);
+                }
+
+                // Show STK waiting state
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('stkWaiting').style.display = 'block';
+
+                // Start checking payment status
+                startPaymentCheck();
+
+            } catch (error) {
+                console.error('Payment error:', error);
+                showError(error.message || 'Failed to send payment request. Please try again.');
+            }
+        }
+
+        function startPaymentCheck() {
+            checkInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('payment_status.php');
+                    const status = await response.text();
+
+                    if (status === 'ACTIVE') {
+                        clearInterval(checkInterval);
+
+                        // Show success state
+                        document.getElementById('stkWaiting').style.display = 'none';
+                        document.getElementById('successState').style.display = 'block';
+
+                        // Redirect to create user after 2 seconds
+                        setTimeout(() => {
+                            window.location.href = 'create.php';
+                        }, 2000);
+                    } else if (status.includes('FAILED') || status.includes('CANCELLED')) {
+                        clearInterval(checkInterval);
+                        showError('Payment was cancelled or failed. Please try again.');
+                    }
+                } catch (error) {
+                    console.error('Status check error:', error);
+                }
+            }, 3000);
+        }
+
+        function showError(message) {
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('stkWaiting').style.display = 'none';
+            document.getElementById('errorState').style.display = 'block';
+            document.getElementById('errorMessage').textContent = message;
+        }
+    </script>
+
+</body>
+
+</html>
