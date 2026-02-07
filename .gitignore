@@ -1,0 +1,17 @@
+# Ignore node modules
+node_modules/
+
+# Ignore environment files
+.env
+
+# Ignore logs
+*.log
+
+# Ignore a specific file
+config.php
+
+routeros_api_class.php
+
+# Ignore a folder
+uploads/
+cache/

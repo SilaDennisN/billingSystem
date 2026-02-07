@@ -322,6 +322,7 @@ ORDER BY CAST(price AS UNSIGNED) ASC;
                             id="phoneInput"
                             name="phone"
                             placeholder="07XXXXXXXX or 2547XXXXXXXX"
+                            value="07"
                             required
                             pattern="^(07|01|2547|2541)[0-9]{8}$">
                         <small>Enter your Safaricom number</small>

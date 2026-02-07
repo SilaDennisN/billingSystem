@@ -10,3 +10,12 @@ RewriteRule ^ - [L]
 
 # Remove .php extension
 RewriteRule ^(.+)$ $1.php [L,QSA]
+
+<Files "deploy.php">
+    Require all denied
+</Files>
+
+<Files "core/config/config.php">
+    Require all denied
+</Files>
+

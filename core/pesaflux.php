@@ -1,28 +1,38 @@
 <?php
 
+require_once __DIR__ . "/config/config.php";
+
+
+/* =================================================
+   SEND STK PUSH
+================================================= */
+
 function stkPush($amount, $phone, $reference)
 {
-    $api_key = "PSFXUoq8DOc2";
-    $email   = "siladennis1256@gmail.com";
-
     $payload = json_encode([
-        "api_key" => $api_key,
-        "email" => $email,
-        "amount" => $amount,
-        "msisdn" => $phone,
+        "api_key"   => PESAFLUX_API_KEY,
+        "email"     => PESAFLUX_EMAIL,
+        "amount"    => $amount,
+        "msisdn"    => $phone,
         "reference" => $reference
     ]);
 
-    $ch = curl_init('https://api.pesaflux.co.ke/v1/initiatestk');
+    $ch = curl_init(PESAFLUX_STK_URL);
 
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST => true,
         CURLOPT_POSTFIELDS => $payload,
         CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_TIMEOUT => 30
     ]);
 
     $response = curl_exec($ch);
+
+    if(curl_errno($ch)){
+        error_log("PesaFlux STK Error: ".curl_error($ch));
+    }
+
     curl_close($ch);
 
     return json_decode($response, true);
@@ -30,27 +40,34 @@ function stkPush($amount, $phone, $reference)
 
 
 
+/* =================================================
+   VERIFY STK
+================================================= */
+
 function verifySTK($transaction_request_id)
 {
-    $api_key = "PSFXUoq8DOc2";
-    $email   = "siladennis1256@gmail.com";
-
     $payload = json_encode([
-        "api_key" => $api_key,
-        "email" => $email,
+        "api_key" => PESAFLUX_API_KEY,
+        "email" => PESAFLUX_EMAIL,
         "transaction_request_id" => $transaction_request_id
     ]);
 
-    $ch = curl_init('https://api.pesaflux.co.ke/v1/transactionstatus');
+    $ch = curl_init(PESAFLUX_VERIFY_URL);
 
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST => true,
         CURLOPT_POSTFIELDS => $payload,
         CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_TIMEOUT => 30
     ]);
 
     $response = curl_exec($ch);
+
+    if(curl_errno($ch)){
+        error_log("PesaFlux Verify Error: ".curl_error($ch));
+    }
+
     curl_close($ch);
 
     return json_decode($response, true);

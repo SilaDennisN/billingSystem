@@ -1,91 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>Connecting...</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8">
 
-<style>
-    body {
-        background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-        height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
-        color: #fff;
-    }
+<!-- CRITICAL: Never start captive flow with HTTPS -->
+<meta http-equiv="refresh"
+content="0; url=http://inovatech.co.ke/billing/portal/index.php?mac=$(mac)&ip=$(ip)&username=$(username)&link-login=$(link-login)&link-login-only=$(link-login-only)&link-orig=$(link-orig)&error=$(error)&chap-id=$(chap-id)&chap-challenge=$(chap-challenge)&server-name=$(server-name)&identity=$(identity)">
 
-    .card {
-        background: #ffffff;
-        color: #333;
-        padding: 30px 20px;
-        border-radius: 16px;
-        text-align: center;
-        width: 100%;
-        max-width: 380px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-    }
+<title>Redirecting...</title>
 
-    .loader {
-        width: 40px;
-        height: 40px;
-        border: 4px solid #eee;
-        border-top: 4px solid #2c5364;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin: 20px auto;
-    }
+<!-- Backup redirect for stubborn phones -->
+<script>
+window.location.replace(
+"http://inovatech.co.ke/billing/portal/index.php?mac=$(mac)&ip=$(ip)&username=$(username)&link-login=$(link-login)&link-login-only=$(link-login-only)&link-orig=$(link-orig)&error=$(error)&chap-id=$(chap-id)&chap-challenge=$(chap-challenge)&server-name=$(server-name)&identity=$(identity)"
+);
+</script>
 
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-
-    .small {
-        font-size: 13px;
-        color: #777;
-    }
-</style>
 </head>
 
 <body>
-
-<div class="card">
-    <h2 id="title">Connecting you…</h2>
-    <p id="message">Please wait while we get you online.</p>
-    <div class="loader"></div>
-    <p class="small">This will only take a moment</p>
-</div>
-
-<form id="redirectForm" action="https://inovatech.co.ke/billing/portal/index.php" method="post">
-    <input type="hidden" name="mac" value="$(mac)">
-    <input type="hidden" name="ip" value="$(ip)">
-    <input type="hidden" name="username" value="$(username)">
-    <input type="hidden" name="link-login" value="$(link-login)">
-    <input type="hidden" name="link-login-only" value="$(link-login-only)">
-    <input type="hidden" name="link-orig" value="$(link-orig)">
-    <input type="hidden" name="error" value="$(error)">
-</form>
-
-<script>
-    // Detect reconnecting users (username already exists)
-    const isReconnect = "$(username)" !== "";
-
-    if (isReconnect) {
-        document.getElementById("title").innerText = "Welcome back 👋";
-        document.getElementById("message").innerText =
-            "Reconnecting you to the internet. Please wait...";
-    } else {
-        document.getElementById("title").innerText = "Success 🎉";
-        document.getElementById("message").innerText =
-            "Your connection is being established.";
-    }
-
-    // Delay submit slightly so UI renders (prevents freeze)
-    setTimeout(() => {
-        document.getElementById("redirectForm").submit();
-    }, 600);
-</script>
-
+Redirecting to login...
 </body>
 </html>

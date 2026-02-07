@@ -1,56 +1,78 @@
 <?php
 
-/**
- * PESAFLUX PRODUCTION WEBHOOK
- * --------------------------------
- * - Confirms STK payment
- * - Creates Mikrotik hotspot user
- * - Activates payment for auto-login
- */
-
 date_default_timezone_set('Africa/Nairobi');
+require_once __DIR__ . "/config/config.php";
 
 require_once __DIR__ . "/../core/db.php";
 require_once __DIR__ . "/../core/router.php";
+require_once __DIR__ . "/../core/sms.php";
+
 
 use RouterOS\Query;
 
 
-/* -------------------------------------------------
-   1. READ RAW INPUT + LOG (CRITICAL FOR DEBUGGING)
-------------------------------------------------- */
+/* =================================================
+   CREATE LOG DIRECTORY
+================================================= */
 
-$raw = file_get_contents("php://input");
+$logDir = __DIR__ . "/logs";
 
-file_put_contents(
-    __DIR__ . "/pesaflux.log",
-    date("Y-m-d H:i:s") . " " . $raw . PHP_EOL,
-    FILE_APPEND
-);
+if (!is_dir($logDir)) {
+    mkdir($logDir, 0777, true);
+}
 
-$data = json_decode($raw, true);
+function logMsg($file, $msg)
+{
+    global $logDir;
 
-file_put_contents(
-    __DIR__ . "/debug_ids.log",
-    "TX_FROM_WEBHOOK: " . ($data['TransactionID'] ?? 'NONE') . PHP_EOL,
-    FILE_APPEND
-);
-
-
-if (!$data) {
-    http_response_code(400);
-    exit("Invalid payload");
+    file_put_contents(
+        $logDir . "/" . $file . "_" . date("Ymd") . ".log",
+        date("H:i:s") . " | " . $msg . PHP_EOL,
+        FILE_APPEND
+    );
 }
 
 
-/* -------------------------------------------------
-   2. EXTRACT REQUIRED FIELDS
-------------------------------------------------- */
-// THIS is your real request id
-$transaction_id = $data['TransactionID'] ?? null;
+/* =================================================
+   ROUTER SAFE QUERY (Detect !trap)
+================================================= */
 
-// SUCCESS is ResponseCode = 0
-$status = ($data['ResponseCode'] == 0) ? 'SUCCESS' : 'FAILED';
+function routerQuery($client, Query $query)
+{
+    $response = $client->query($query)->read();
+
+    foreach ($response as $r) {
+        if (isset($r['!trap'])) {
+            throw new Exception("Router trap: " . json_encode($r));
+        }
+    }
+
+    return $response;
+}
+
+
+
+/* =================================================
+   READ WEBHOOK
+================================================= */
+
+$raw = file_get_contents("php://input");
+logMsg("pesaflux", $raw);
+
+$data = json_decode($raw, true);
+
+if (!$data) {
+    http_response_code(400);
+    exit("Invalid JSON");
+}
+
+
+/* =================================================
+   EXTRACT DATA
+================================================= */
+
+$transaction_id = $data['TransactionID'] ?? null;
+$status = ($data['ResponseCode'] ?? 1) == 0 ? 'SUCCESS' : 'FAILED';
 
 if (!$transaction_id) {
     http_response_code(400);
@@ -58,130 +80,247 @@ if (!$transaction_id) {
 }
 
 
-/* -------------------------------------------------
-   3. FETCH PAYMENT (LOCK ROW)
-------------------------------------------------- */
-
-$stmt = $pdo->prepare("
-    SELECT * FROM payments
-    WHERE transaction_request_id=?
-    LIMIT 1
-");
-$stmt->execute([$transaction_id]);
-$payment = $stmt->fetch();
-
-if (!$payment) {
-    http_response_code(404);
-    exit("Payment not found");
-}
-
-
-/* -------------------------------------------------
-   4. STOP IF ALREADY PROCESSED
-------------------------------------------------- */
-
-if (in_array($payment['status'], ['active', 'used'])) {
-    http_response_code(200);
-    exit("Already processed");
-}
-
-
-/* -------------------------------------------------
-   5. HANDLE FAILED PAYMENT
-------------------------------------------------- */
-
-if ($status !== 'SUCCESS') {
-
-    $pdo->prepare("
-        UPDATE payments
-        SET status='failed'
-        WHERE payment_id=?
-    ")->execute([$payment['payment_id']]);
-
-    http_response_code(200);
-    exit("Payment failed");
-}
-
-
-/* -------------------------------------------------
-   6. ACTIVATE PAYMENT (TRANSACTION SAFE)
-------------------------------------------------- */
+/* =================================================
+   DB TRANSACTION
+================================================= */
 
 $pdo->beginTransaction();
 
 try {
 
-    /* ---- Build credentials ---- */
-    // $mac = $payment['mac'];
-    // $username = 'mac_' . str_replace(':', '', strtolower($mac));
-    $username = $payment['username'];
-    $password = '123456'; // or generate dynamically
+    /* LOCK PAYMENT */
+    $stmt = $pdo->prepare("
+        SELECT * FROM payments
+        WHERE transaction_request_id = ?
+        LIMIT 1
+        FOR UPDATE
+    ");
+
+    $stmt->execute([$transaction_id]);
+    $payment = $stmt->fetch();
+
+    if (!$payment) {
+        throw new Exception("Payment not found");
+    }
 
 
-    /* ---- Load plan ---- */
+    /* STOP DUPLICATES */
+    if (in_array($payment['status'], ['used', 'active'])) {
+        $pdo->commit();
+        exit("Already processed");
+    }
+
+
+    /* FAILED PAYMENT */
+    if ($status !== 'SUCCESS') {
+
+        $pdo->prepare("
+            UPDATE payments
+            SET status='failed'
+            WHERE payment_id=?
+        ")->execute([$payment['payment_id']]);
+
+        $pdo->commit();
+        exit("Payment failed");
+    }
+
+
+    /* LOAD PLAN */
     $stmt = $pdo->prepare("
         SELECT * FROM hotspot_profiles
-        WHERE id=? AND plan_type='hotspot'
+        WHERE id=? LIMIT 1
     ");
+
     $stmt->execute([$payment['plan_id']]);
     $plan = $stmt->fetch();
 
     if (!$plan) {
-        throw new Exception("Invalid plan");
+        throw new Exception("Invalid hotspot plan");
     }
 
 
-    /* ---- Connect router ---- */
+    /* CONNECT ROUTER */
     $client = router_connect($payment['router_id']);
+
     if (!$client) {
         throw new Exception("Router connection failed");
     }
 
+    logMsg("router", "Connected to router");
 
-    /* ---- Create Mikrotik user ---- */
-    $query = new Query('/ip/hotspot/user/add');
-    $query->equal('name', $username);
-    $query->equal('password', $password);
-    $query->equal('profile', $plan['profile_name']);
-    $query->equal('comment', 'Paid via STK');
 
-    if ($plan['validity_hours']) {
-        $query->equal('limit-uptime', $plan['validity_hours'] . 'h');
-    } elseif ($plan['validity_days']) {
-        $query->equal('limit-uptime', $plan['validity_days'] . 'd');
+    $username = $payment['username'];
+    $password = '123456';
+
+    $limit = null;
+
+    if (!empty($plan['validity_hours'])) {
+        $limit = $plan['validity_hours'] . "h";
+    } elseif (!empty($plan['validity_days'])) {
+        $limit = $plan['validity_days'] . "d";
     }
 
-    $client->query($query)->read();
 
 
-    /* ---- Activate payment ---- */
+/* =================================================
+   REMOVE ACTIVE SESSION
+================================================= */
+
+$active = new Query('/ip/hotspot/active/print');
+$active->where('user', $username);
+
+$actives = routerQuery($client, $active);
+
+foreach ($actives as $a) {
+
+    $remove = new Query('/ip/hotspot/active/remove');
+    $remove->equal('.id', $a['.id']);
+
+    routerQuery($client, $remove);
+}
+
+logMsg("router", "Active sessions cleared");
+
+
+/* =================================================
+   REMOVE HOST CACHE (VERY IMPORTANT)
+================================================= */
+$macRouter = strtoupper(implode(":", str_split(substr($username,4),2)));
+
+$host = new Query('/ip/hotspot/host/print');
+$host->where('mac-address', $macRouter);
+
+$hosts = routerQuery($client, $host);
+
+foreach ($hosts as $h) {
+
+    $remove = new Query('/ip/hotspot/host/remove');
+    $remove->equal('.id', $h['.id']);
+
+    routerQuery($client, $remove);
+}
+
+logMsg("router", "Host cache cleared");
+
+
+/* =================================================
+   DELETE OLD USER
+================================================= */
+
+$check = new Query('/ip/hotspot/user/print');
+$check->where('name', $username);
+
+$users = routerQuery($client, $check);
+
+foreach ($users as $u) {
+
+    $remove = new Query('/ip/hotspot/user/remove');
+    $remove->equal('.id', $u['.id']);
+
+    routerQuery($client, $remove);
+}
+
+logMsg("router", "Old user removed");
+
+
+/* =================================================
+   CREATE NEW USER
+================================================= */
+
+$add = new Query('/ip/hotspot/user/add');
+$add->equal('name', $username);
+$add->equal('password', $password);
+$add->equal('profile', $plan['profile_name']);
+$add->equal('comment', 'Paid ' . date("Y-m-d H:i"));
+
+if ($limit) {
+    $add->equal('limit-uptime', $limit);
+}
+
+routerQuery($client, $add);
+
+logMsg("router", "User created");
+
+
+/* =================================================
+   VERIFY USER EXISTS (CRITICAL)
+================================================= */
+
+$verify = new Query('/ip/hotspot/user/print');
+$verify->where('name', $username);
+
+$result = routerQuery($client, $verify);
+
+if (empty($result)) {
+    throw new Exception("Router failed to create user");
+}
+
+/* =================================================
+   MARK PAYMENT USED
+================================================= */
+
+
+$mac = $username;
+$phone = $payment['phone'];
+
+if(!empty($phone)){
+
     $stmt = $pdo->prepare("
-        UPDATE payments
-        SET status='used',
-            username=?,
-            confirmed_at=NOW()
-        WHERE payment_id=?
+        SELECT id FROM hotspot_devices
+        WHERE mac=?
+        LIMIT 1
     ");
+    $stmt->execute([$mac]);
 
-    $stmt->execute([
-        $username,
-        $payment['payment_id']
-    ]);
+    $device = $stmt->fetch();
+
+    if(!$device){
+
+        // save device
+        $pdo->prepare("
+            INSERT INTO hotspot_devices (mac, phone, welcome_sms_sent)
+            VALUES (?, ?, 1)
+        ")->execute([$mac, $phone]);
 
 
-    $pdo->commit();
+        $message = "PAY G WiFi Active ✅
 
-    http_response_code(200);
-    echo "OK";
+Check remaining time or reconnect:
+http://portal.inovatech.co.ke
+
+Enjoy fast internet!
+- Inovatech";
+
+        sendSMS($phone, $message);
+
+        logMsg("sms", "Welcome SMS sent to $phone");
+    }
+}
+
+
+
+/* =================================================
+   MARK PAYMENT USED
+================================================= */
+
+$pdo->prepare("
+    UPDATE payments
+    SET status='used',
+        confirmed_at=NOW()
+    WHERE payment_id=?
+")->execute([$payment['payment_id']]);
+
+$pdo->commit();
+
+logMsg("success", "USER: {$username} | TX: {$transaction_id}");
+
+echo "OK";
+
 } catch (Throwable $e) {
 
     $pdo->rollBack();
 
-    file_put_contents(
-        __DIR__ . "/errors.log",
-        date("Y-m-d H:i:s") . " " . $e->getMessage() . PHP_EOL,
-        FILE_APPEND
-    );
+    logMsg("errors", $e->getMessage());
 
     http_response_code(500);
     echo "ERROR";

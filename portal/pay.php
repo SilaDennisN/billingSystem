@@ -26,16 +26,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!empty($response['transaction_request_id'])) {
 
+        // SAVE PHONE + TX
         $pdo->prepare("
             UPDATE payments
-            SET transaction_request_id=?
+            SET transaction_request_id=?,
+                phone=?
             WHERE payment_id=?
         ")->execute([
             $response['transaction_request_id'],
+            $phone,
             $payment['payment_id']
         ]);
 
-        // reload page into WAIT mode
         header("Location: pay.php?waiting=1");
         exit;
     }
@@ -44,44 +46,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 ?>
 
-<?php if(isset($_GET['waiting'])): ?>
 
-<h2>📲 STK Sent</h2>
-<p>Enter your M-Pesa PIN on your phone.</p>
-<p>Connecting you automatically once payment is confirmed...</p>
+<?php if (isset($_GET['waiting'])): ?>
 
-<script>
+    <h2>📲 STK Sent</h2>
+    <p>Enter your M-Pesa PIN on your phone.</p>
+    <p>Connecting you automatically once payment is confirmed...</p>
 
-// check DB directly instead of verify script
-setInterval(() => {
+    <script>
+        // check DB directly instead of verify script
+        setInterval(() => {
 
-    fetch("payment_status.php")
-        .then(res => res.text())
-        .then(status => {
+            fetch("payment_status.php")
+                .then(res => res.text())
+                .then(status => {
 
-            if(status === "ACTIVE"){
-                window.location = "create.php";
-            }
+                    if (status === "ACTIVE") {
+                        window.location = "create.php";
+                    }
 
-        });
+                });
 
-}, 3000);
-
-</script>
+        }, 3000);
+    </script>
 
 <?php else: ?>
 
-<form method="post">
-    <h2>Pay KES <?= $payment['amount'] ?></h2>
+    <form method="post">
+        <h2>Pay KES <?= $payment['amount'] ?></h2>
 
-    <input name="phone"
-           placeholder="07XXXXXXXX"
-           required
-           style="padding:10px;width:250px">
+        <input name="phone"
+            placeholder="07XXXXXXXX"
+            required
+            style="padding:10px;width:250px">
 
-    <button type="submit">
-        Pay Now
-    </button>
-</form>
+        <button type="submit">
+            Pay Now
+        </button>
+    </form>
 
 <?php endif; ?>

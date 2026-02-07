@@ -1,3 +1,0 @@
-2026-02-04 14:09:46 SQLSTATE[42S22]: Column not found: 1054 Unknown column 'password' in 'field list'
-2026-02-04 14:14:29 SQLSTATE[42S22]: Column not found: 1054 Unknown column 'password' in 'field list'
-2026-02-04 14:17:44 SQLSTATE[42S22]: Column not found: 1054 Unknown column 'password' in 'field list'
