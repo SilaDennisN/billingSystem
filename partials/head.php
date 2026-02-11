@@ -48,6 +48,7 @@ function isCollapsed($paths = [])
     <!-- Roboto and Roboto Mono fonts from Google Fonts-->
     <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,500" rel="stylesheet" />
+    <link href="../assets/font-awesome-4.7.0/css/font-awesome.min.css" rel="stylesheet" />
     <!-- Load main stylesheet-->
     <link href="../assets/npm/simple-datatables@7.1.2/dist/style.min.css" rel="stylesheet" />
     <link href="../assets/css/styles.css" rel="stylesheet" />

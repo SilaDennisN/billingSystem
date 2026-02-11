@@ -76,7 +76,7 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
                                             <div class="h3 mb-0"><?= count($routers) ?></div>
                                         </div>
                                         <div class="ms-3">
-                                            <i class="fas fa-server fa-2x text-primary opacity-50"></i>
+                                            <i class="fa fa-server fa-2x text-primary opacity-50"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -92,7 +92,7 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
                                             <div class="h3 mb-0" id="statOnline">0</div>
                                         </div>
                                         <div class="ms-3">
-                                            <i class="fas fa-check-circle fa-2x text-success opacity-50"></i>
+                                            <i class="fa fa-check-circle fa-2x text-success opacity-50"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -108,7 +108,7 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
                                             <div class="h3 mb-0" id="statOffline">0</div>
                                         </div>
                                         <div class="ms-3">
-                                            <i class="fas fa-times-circle fa-2x text-danger opacity-50"></i>
+                                            <i class="fa fa-times-circle fa-2x text-danger opacity-50"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -124,7 +124,7 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
                                             <div class="h3 mb-0" id="statAvgSpeed">0 Mbps</div>
                                         </div>
                                         <div class="ms-3">
-                                            <i class="fas fa-tachometer-alt fa-2x text-info opacity-50"></i>
+                                            <i class="fa fa-tachometer-alt fa-2x text-info opacity-50"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -153,11 +153,11 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
                                 <table class="table table-hover align-middle mb-0">
                                     <thead class="table-light">
                                         <tr>
-                                            <th><i class="fas fa-tag me-1"></i>Name</th>
-                                            <th><i class="fas fa-network-wired me-1"></i>Host</th>
-                                            <th><i class="fas fa-signal me-1"></i>Status</th>
-                                            <th><i class="fas fa-clock me-1"></i>Last Seen</th>
-                                            <th><i class="fas fa-tachometer-alt me-1"></i>Network Speed</th>
+                                            <th><i class="fa fa-tag me-1"></i>Name</th>
+                                            <th><i class="fa fa-network-wired me-1"></i>Host</th>
+                                            <th><i class="fa fa-signal me-1"></i>Status</th>
+                                            <th><i class="fa fa-clock me-1"></i>Last Seen</th>
+                                            <th><i class="fa fa-tachometer-alt me-1"></i>Network Speed</th>
                                             <th class="text-end"><i class="fas fa-cog me-1"></i>Actions</th>
                                         </tr>
                                     </thead>
@@ -168,7 +168,7 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
                                                     <div class="d-flex align-items-center">
                                                         <div class="avatar avatar-sm me-2">
                                                             <div class="avatar-title bg-primary-soft text-primary rounded-circle">
-                                                                <i class="fas fa-server"></i>
+                                                                <i class="fa fa-server"></i>
                                                             </div>
                                                         </div>
                                                         <strong><?= htmlspecialchars($router['name']) ?></strong>
@@ -177,12 +177,12 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
                                                 <td><code class="text-muted"><?= htmlspecialchars($router['host']) ?></code></td>
                                                 <td>
                                                     <span class="badge bg-secondary status-badge">
-                                                        <i class="fas fa-spinner fa-spin me-1"></i>Checking...
+                                                        <i class="fa fa-spinner fa-spin me-1"></i>Checking...
                                                     </span>
                                                 </td>
                                                 <td class="last-seen">
                                                     <small class="text-muted">
-                                                        <i class="fas fa-clock me-1"></i>
+                                                        <i class="fa fa-clock me-1"></i>
                                                         <?= $router['last_seen'] ?? '—' ?>
                                                     </small>
                                                 </td>
@@ -191,7 +191,7 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
                                                         <canvas id="speedChart-<?= $router['router_id'] ?>" width="120" height="40"></canvas>
                                                         <div>
                                                             <div class="badge bg-info-soft text-info" id="currentSpeed-<?= $router['router_id'] ?>">
-                                                                <i class="fas fa-sync-alt fa-spin"></i> Loading...
+                                                                <i class="fa fa-sync-alt fa-spin"></i> Loading...
                                                             </div>
                                                         </div>
                                                     </div>
@@ -199,13 +199,13 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
                                                 <td class="text-end">
                                                     <div class="btn-group btn-group-sm">
                                                         <button class="btn btn-outline-primary view-router" data-id="<?= $router['router_id'] ?>" title="View Details">
-                                                            <i class="fas fa-eye"></i>
+                                                            <i class="fa fa-eye"></i>
                                                         </button>
                                                         <button class="btn btn-outline-secondary edit-router" data-id="<?= $router['router_id'] ?>" title="Edit">
-                                                            <i class="fas fa-edit"></i>
+                                                            <i class="fa fa-edit"></i>
                                                         </button>
                                                         <button class="btn btn-outline-danger delete-router" data-id="<?= $router['router_id'] ?>" title="Delete">
-                                                            <i class="fas fa-trash"></i>
+                                                            <i class="fa fa-trash"></i>
                                                         </button>
                                                     </div>
                                                 </td>
@@ -221,7 +221,7 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
                                     <i class="fas fa-server fa-3x text-muted mb-3"></i>
                                     <p class="text-muted">No routers configured yet</p>
                                     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRouterModal">
-                                        <i class="fas fa-plus me-1"></i>Add Your First Router
+                                        <i class="fa fa-plus me-1"></i>Add Your First Router
                                     </button>
                                 </div>
                             <?php endif; ?>
@@ -361,7 +361,7 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
                                 badge.innerHTML = '<i class="fas fa-pause-circle me-1"></i>Idle';
                                 badge.className = "badge status-badge bg-warning text-dark";
                             } else {
-                                badge.innerHTML = '<i class="fas fa-check-circle me-1"></i>Online';
+                                badge.innerHTML = '<i class="fa fa-check-circle me-1"></i>Online';
                                 badge.className = "badge status-badge bg-success";
                             }
 
@@ -413,7 +413,7 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
                             // Update speed display with dynamic units
                             const currentSpeedEl = document.getElementById(`currentSpeed-${routerId}`);
                             const speedBps = speedValue * 1e6; // Convert Mbps to bps
-                            currentSpeedEl.innerHTML = `<i class="fas fa-tachometer-alt me-1"></i>${formatSpeed(speedBps)}`;
+                            currentSpeedEl.innerHTML = `<i class="fa fa-tachometer-alt me-1"></i>${formatSpeed(speedBps)}`;
 
                             // Update badge color based on speed
                             if (speedValue >= 50) {
@@ -428,10 +428,10 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
                         })
                         .catch(err => {
                             console.error(err);
-                            badge.innerHTML = '<i class="fas fa-times-circle me-1"></i>Error';
+                            badge.innerHTML = '<i class="fa fa-times-circle me-1"></i>Error';
                             badge.className = "badge status-badge bg-danger";
                             const currentSpeedEl = document.getElementById(`currentSpeed-${routerId}`);
-                            currentSpeedEl.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Error';
+                            currentSpeedEl.innerHTML = '<i class="fa fa-exclamation-triangle me-1"></i>Error';
                             currentSpeedEl.className = "badge bg-danger-soft text-danger";
                             updateStats();
                         });

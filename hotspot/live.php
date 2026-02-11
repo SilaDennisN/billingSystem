@@ -255,7 +255,7 @@ if (!is_logged_in()) {
                             </div>
                         </td>
                         <td class="text-center">
-                            <form method="POST" action="/hotspot/live/kick.php" style="display: inline;">
+                            <form method="POST" action="../hotspot/live/kick.php" style="display: inline;">
                                 <input type="hidden" name="router_id" value="${u.router_id}">
                                 <input type="hidden" name="username" value="${u.username}">
                                 <button class="btn btn-sm btn-danger" title="Disconnect User">

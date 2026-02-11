@@ -126,16 +126,16 @@ $expiringSoon = $pdo->query("
         <div class="d-flex justify-content-between align-items-center py-3">
             <div>
                 <h1 class="text-white mb-0 display-6">
-                    <i class="fas fa-chart-line me-2"></i>Dashboard
+                    <i class="fa fa-chart-line me-2"></i>Dashboard
                 </h1>
                 <p class="text-white-50 mb-0 mt-1">ISP Overview & System Analytics</p>
             </div>
             <div class="d-flex align-items-center gap-2">
                 <span class="badge bg-success-soft text-success">
-                    <i class="fas fa-circle me-1"></i>System Online
+                    <i class="fa fa-circle me-1"></i>System Online
                 </span>
                 <span class="badge bg-info-soft text-info">
-                    <i class="fas fa-clock me-1"></i><?= date('M d, Y H:i') ?>
+                    <i class="fa fa-clock me-1"></i><?= date('M d, Y H:i') ?>
                 </span>
             </div>
         </div>
@@ -156,18 +156,18 @@ $expiringSoon = $pdo->query("
                         <div class="small text-muted mb-1">Active Users</div>
                         <div class="h2 mb-0"><?= $activeUsers ?></div>
                         <div class="small text-success">
-                            <i class="fas fa-arrow-up me-1"></i>
+                            <i class="fa fa-arrow-up me-1"></i>
                             <?= round(($activeUsers/$totalUsers)*100, 1) ?>% of total
                         </div>
                     </div>
                     <div class="ms-3">
                         <div class="avatar avatar-xl bg-success-soft">
-                            <i class="fas fa-users fa-2x text-success"></i>
+                            <i class="fa fa-users fa-2x text-success"></i>
                         </div>
                     </div>
                 </div>
                 <a href="../hotspotUsers" class="btn btn-sm btn-success-soft text-success w-100 mt-3">
-                    <i class="fas fa-eye me-1"></i>View Users
+                    <i class="fa fa-eye me-1"></i>View Users
                 </a>
             </div>
         </div>
@@ -181,18 +181,18 @@ $expiringSoon = $pdo->query("
                         <div class="small text-muted mb-1">Today's Revenue</div>
                         <div class="h2 mb-0">KES <?= number_format($todayRevenue, 0) ?></div>
                         <div class="small text-primary">
-                            <i class="fas fa-calendar-day me-1"></i>
+                            <i class="fa fa-calendar-day me-1"></i>
                             <?= date('l') ?>
                         </div>
                     </div>
                     <div class="ms-3">
                         <div class="avatar avatar-xl bg-primary-soft">
-                            <i class="fas fa-coins fa-2x text-primary"></i>
+                            <i class="fa fa-coins fa-2x text-primary"></i>
                         </div>
                     </div>
                 </div>
-                <a href="../payments" class="btn btn-sm btn-primary-soft text-primary w-100 mt-3">
-                    <i class="fas fa-money-bill-wave me-1"></i>View Payments
+                <a href="../plans/payments" class="btn btn-sm btn-primary-soft text-primary w-100 mt-3">
+                    <i class="fa fa-money-bill-wave me-1"></i>View Payments
                 </a>
             </div>
         </div>
@@ -206,18 +206,18 @@ $expiringSoon = $pdo->query("
                         <div class="small text-muted mb-1">Expiring Soon</div>
                         <div class="h2 mb-0"><?= $expiringSoon ?></div>
                         <div class="small text-warning">
-                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            <i class="fa fa-exclamation-triangle me-1"></i>
                             Next 7 days
                         </div>
                     </div>
                     <div class="ms-3">
                         <div class="avatar avatar-xl bg-warning-soft">
-                            <i class="fas fa-clock fa-2x text-warning"></i>
+                            <i class="fa fa-clock fa-2x text-warning"></i>
                         </div>
                     </div>
                 </div>
                 <a href="../hotspotUsers?filter=expiring" class="btn btn-sm btn-warning-soft text-warning w-100 mt-3">
-                    <i class="fas fa-list me-1"></i>View List
+                    <i class="fa fa-list me-1"></i>View List
                 </a>
             </div>
         </div>
@@ -231,18 +231,18 @@ $expiringSoon = $pdo->query("
                         <div class="small text-muted mb-1">Routers Online</div>
                         <div class="h2 mb-0"><?= $routersOnline ?> / <?= $totalRouters ?></div>
                         <div class="small text-info">
-                            <i class="fas fa-signal me-1"></i>
+                            <i class="fa fa-signal me-1"></i>
                             <?= round(($routersOnline/$totalRouters)*100, 1) ?>% uptime
                         </div>
                     </div>
                     <div class="ms-3">
                         <div class="avatar avatar-xl bg-info-soft">
-                            <i class="fas fa-server fa-2x text-info"></i>
+                            <i class="fa fa-server fa-2x text-info"></i>
                         </div>
                     </div>
                 </div>
                 <a href="../routers" class="btn btn-sm btn-info-soft text-info w-100 mt-3">
-                    <i class="fas fa-cog me-1"></i>Manage Routers
+                    <i class="fa fa-cog me-1"></i>Manage Routers
                 </a>
             </div>
         </div>
@@ -295,7 +295,7 @@ $expiringSoon = $pdo->query("
     <div class="col-lg-8 mb-4">
         <div class="card card-raised h-100">
             <div class="card-header bg-primary text-white">
-                <i class="fas fa-chart-bar me-2"></i>Revenue Overview (Last 7 Days)
+                <i class="fa fa-chart-bar me-2"></i>Revenue Overview (Last 7 Days)
             </div>
             <div class="card-body">
                 <canvas id="revenueChart" height="80"></canvas>
@@ -307,7 +307,7 @@ $expiringSoon = $pdo->query("
     <div class="col-lg-4 mb-4">
         <div class="card card-raised h-100">
             <div class="card-header bg-primary text-white">
-                <i class="fas fa-pie-chart me-2"></i>Users by Type
+                <i class="fa fa-pie-chart me-2"></i>Users by Type
             </div>
             <div class="card-body">
                 <canvas id="userTypeChart"></canvas>
@@ -328,7 +328,7 @@ $expiringSoon = $pdo->query("
     <div class="card card-raised shadow-sm mb-4">
         <div class="card-header bg-primary text-white">
             <div class="d-flex justify-content-between align-items-center">
-                <div><i class="fas fa-money-bill-wave me-2"></i>Recent Payments</div>
+                <div><i class="fa fa-money-bill-wave me-2"></i>Recent Payments</div>
                 <a href="../payments" class="btn btn-sm btn-light">View All</a>
             </div>
         </div>
@@ -337,10 +337,10 @@ $expiringSoon = $pdo->query("
                 <table class="table table-hover mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th><i class="fas fa-user me-1"></i>User</th>
-                            <th><i class="fas fa-credit-card me-1"></i>Method</th>
-                            <th><i class="fas fa-money-bill me-1"></i>Amount</th>
-                            <th><i class="fas fa-clock me-1"></i>Date</th>
+                            <th><i class="fa fa-user me-1"></i>User</th>
+                            <th><i class="fa fa-credit-card me-1"></i>Method</th>
+                            <th><i class="fa fa-money-bill me-1"></i>Amount</th>
+                            <th><i class="fa fa-clock me-1"></i>Date</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -349,7 +349,7 @@ $expiringSoon = $pdo->query("
                             <td>
                                 <div class="d-flex align-items-center">
                                     <div class="avatar avatar-sm me-2 bg-primary-soft">
-                                        <i class="fas fa-user text-primary"></i>
+                                        <i class="fa fa-user text-primary"></i>
                                     </div>
                                     <strong><?= htmlspecialchars($p['username'] ?? 'Guest') ?></strong>
                                 </div>
@@ -362,7 +362,7 @@ $expiringSoon = $pdo->query("
                             <td><strong class="text-success">KES <?= number_format($p['amount'],2) ?></strong></td>
                             <td>
                                 <small class="text-muted">
-                                    <i class="fas fa-calendar me-1"></i>
+                                    <i class="fa fa-calendar me-1"></i>
                                     <?= date('M d, H:i', strtotime($p['created_at'])) ?>
                                 </small>
                             </td>
@@ -418,7 +418,7 @@ $expiringSoon = $pdo->query("
     <div class="card card-raised shadow-sm">
         <div class="card-header bg-primary text-white">
             <div class="d-flex justify-content-between align-items-center">
-                <div><i class="fas fa-user-plus me-2"></i>Recently Added Users</div>
+                <div><i class="fa fa-user-plus me-2"></i>Recently Added Users</div>
                 <a href="../hotspotUsers" class="btn btn-sm btn-light">View All</a>
             </div>
         </div>
@@ -427,13 +427,13 @@ $expiringSoon = $pdo->query("
                 <div class="d-flex justify-content-between align-items-center border-bottom py-3">
                     <div class="d-flex align-items-center">
                         <div class="avatar avatar-sm me-3 bg-<?= $u['user_type']=='pppoe'?'info':'secondary' ?>-soft">
-                            <i class="fas fa-user text-<?= $u['user_type']=='pppoe'?'info':'secondary' ?>"></i>
+                            <i class="fa fa-user text-<?= $u['user_type']=='pppoe'?'info':'secondary' ?>"></i>
                         </div>
                         <div>
                             <strong><?= htmlspecialchars($u['username']) ?></strong>
                             <br>
                             <small class="text-muted">
-                                <i class="fas fa-calendar me-1"></i>
+                                <i class="fa fa-calendar me-1"></i>
                                 Expires: <?= date('M d, Y', strtotime($u['expires_at'])) ?>
                             </small>
                         </div>
@@ -467,19 +467,19 @@ $expiringSoon = $pdo->query("
         </div>
         <div class="card-body d-grid gap-2">
             <a href="../hotspotUsers/add" class="btn btn-success">
-                <i class="fas fa-user-plus me-2"></i>Add New User
+                <i class="fa fa-user-plus me-2"></i>Add New User
             </a>
             <a href="../hotspotProfiles/add" class="btn btn-primary">
-                <i class="fas fa-box me-2"></i>Create Package
+                <i class="fa fa-box me-2"></i>Create Package
             </a>
             <a href="../payments" class="btn btn-outline-primary">
-                <i class="fas fa-eye me-2"></i>View Payments
+                <i class="fa fa-eye me-2"></i>View Payments
             </a>
             <a href="../routers" class="btn btn-outline-secondary">
-                <i class="fas fa-server me-2"></i>Manage Routers
+                <i class="fa fa-server me-2"></i>Manage Routers
             </a>
             <a href="../invoices" class="btn btn-outline-info">
-                <i class="fas fa-file-invoice me-2"></i>View Invoices
+                <i class="fa fa-file-invoice me-2"></i>View Invoices
             </a>
         </div>
     </div>
@@ -487,7 +487,7 @@ $expiringSoon = $pdo->query("
     <!-- System Status -->
     <div class="card card-raised shadow-sm mb-4">
         <div class="card-header bg-primary text-white">
-            <i class="fas fa-heartbeat me-2"></i>System Status
+            <i class="fa fa-heartbeat me-2"></i>System Status
         </div>
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
@@ -495,21 +495,21 @@ $expiringSoon = $pdo->query("
                     <div class="small text-muted">Database</div>
                     <strong>Connected</strong>
                 </div>
-                <i class="fas fa-check-circle fa-2x text-success"></i>
+                <i class="fa fa-check-circle fa-2x text-success"></i>
             </div>
             <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
                 <div>
                     <div class="small text-muted">Routers Online</div>
                     <strong><?= $routersOnline ?> / <?= $totalRouters ?></strong>
                 </div>
-                <i class="fas fa-server fa-2x text-info"></i>
+                <i class="fa fa-server fa-2x text-info"></i>
             </div>
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <div class="small text-muted">Active Sessions</div>
                     <strong><?= $activeUsers ?></strong>
                 </div>
-                <i class="fas fa-users fa-2x text-success"></i>
+                <i class="fa fa-users fa-2x text-success"></i>
             </div>
         </div>
     </div>
@@ -517,16 +517,16 @@ $expiringSoon = $pdo->query("
     <!-- System Notes -->
     <div class="card card-raised shadow-sm">
         <div class="card-header bg-primary text-white">
-            <i class="fas fa-sticky-note me-2"></i>System Notes
+            <i class="fa fa-sticky-note me-2"></i>System Notes
         </div>
         <div class="card-body">
             <div class="small text-muted mb-3">
-                <i class="fas fa-info-circle me-1"></i>
+                <i class="fa fa-info-circle me-1"></i>
                 Quick notes and reminders for admin team
             </div>
             <textarea class="form-control mb-2" rows="4" placeholder="Write a note…"></textarea>
             <button class="btn btn-primary btn-sm w-100">
-                <i class="fas fa-save me-1"></i>Save Note
+                <i class="fa fa-save me-1"></i>Save Note
             </button>
         </div>
     </div>

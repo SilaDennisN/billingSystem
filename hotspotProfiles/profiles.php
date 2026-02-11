@@ -71,7 +71,6 @@ if ($selected_router) {
 
             $totalProfiles = count($profiles);
             $configuredCount = count(array_filter($profiles, fn($p) => $p['in_db']));
-
         } catch (Exception $e) {
             $error = "Failed to fetch profiles from router";
         }
@@ -110,18 +109,18 @@ function mergeProfile($routerProfile, $type, $dbIndex)
             <main>
 
                 <!-- Enhanced Header -->
-                <header class="bg-dark">
+                <header class="bg-primary">
                     <div class="container-xl px-1">
                         <div class="d-flex justify-content-between align-items-center py-3">
                             <h1 class="text-white mb-0 display-6">
-                                <i class="fas fa-box me-2"></i>Packages & Profiles
+                                <i class="fa fa-box me-2"></i>Packages & Profiles
                             </h1>
                             <div class="d-flex align-items-center gap-3">
                                 <span class="badge bg-success-soft text-success">
-                                    <i class="fas fa-check-circle me-1"></i><?= $configuredCount ?> Configured
+                                    <i class="fa fa-check-circle me-1"></i><?= $configuredCount ?> Configured
                                 </span>
                                 <span class="badge bg-warning-soft text-warning">
-                                    <i class="fas fa-exclamation-circle me-1"></i><?= $totalProfiles - $configuredCount ?> Router Only
+                                    <i class="fa fa-exclamation-circle me-1"></i><?= $totalProfiles - $configuredCount ?> Router Only
                                 </span>
                             </div>
                         </div>
@@ -141,7 +140,7 @@ function mergeProfile($routerProfile, $type, $dbIndex)
                                             <div class="h3 mb-0"><?= $totalProfiles ?></div>
                                         </div>
                                         <div class="ms-3">
-                                            <i class="fas fa-layer-group fa-2x text-primary opacity-50"></i>
+                                            <i class="fa fa-layer-group fa-2x text-primary opacity-50"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -157,7 +156,7 @@ function mergeProfile($routerProfile, $type, $dbIndex)
                                             <div class="h3 mb-0"><?= $hotspotCount ?></div>
                                         </div>
                                         <div class="ms-3">
-                                            <i class="fas fa-wifi fa-2x text-info opacity-50"></i>
+                                            <i class="fa fa-wifi fa-2x text-info opacity-50"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -173,7 +172,7 @@ function mergeProfile($routerProfile, $type, $dbIndex)
                                             <div class="h3 mb-0"><?= $pppoeCount ?></div>
                                         </div>
                                         <div class="ms-3">
-                                            <i class="fas fa-network-wired fa-2x text-warning opacity-50"></i>
+                                            <i class="fa fa-network-wired fa-2x text-warning opacity-50"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -189,7 +188,7 @@ function mergeProfile($routerProfile, $type, $dbIndex)
                                             <div class="h3 mb-0"><?= $configuredCount ?></div>
                                         </div>
                                         <div class="ms-3">
-                                            <i class="fas fa-check-circle fa-2x text-success opacity-50"></i>
+                                            <i class="fa fa-check-circle fa-2x text-success opacity-50"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -204,7 +203,7 @@ function mergeProfile($routerProfile, $type, $dbIndex)
                                 <div class="row g-3 align-items-end">
                                     <div class="col-md-6">
                                         <label class="form-label">
-                                            <i class="fas fa-server me-1"></i>Select Router
+                                            <i class="fa fa-server me-1"></i>Select Router
                                         </label>
                                         <select name="router_id" class="form-select" onchange="this.form.submit()">
                                             <?php foreach ($routers as $r): ?>
@@ -221,7 +220,7 @@ function mergeProfile($routerProfile, $type, $dbIndex)
                                             class="btn btn-primary w-100"
                                             data-bs-toggle="modal"
                                             data-bs-target="#addProfileModal">
-                                            <i class="fas fa-plus me-2"></i>Add New Package
+                                            <i class="fa fa-plus me-2"></i>Add New Package
                                         </button>
                                     </div>
                                 </div>
@@ -242,7 +241,7 @@ function mergeProfile($routerProfile, $type, $dbIndex)
                         <div class="card-header bg-primary text-white">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <i class="fas fa-list me-2"></i>Profile List
+                                    <i class="fa fa-list me-2"></i>Profile List
                                 </div>
                                 <div class="btn-group btn-group-sm">
                                     <button class="btn btn-light btn-sm active" data-filter="all">
@@ -263,14 +262,14 @@ function mergeProfile($routerProfile, $type, $dbIndex)
                                 <table id="datatablesSimple" class="table table-hover align-middle mb-0">
                                     <thead class="table-light">
                                         <tr>
-                                            <th><i class="fas fa-tag me-1"></i>Profile Name</th>
-                                            <th><i class="fas fa-layer-group me-1"></i>Type</th>
-                                            <th><i class="fas fa-tachometer-alt me-1"></i>Rate Limit</th>
-                                            <th><i class="fas fa-users me-1"></i>Shared Users</th>
-                                            <th><i class="fas fa-money-bill me-1"></i>Price</th>
-                                            <th><i class="fas fa-clock me-1"></i>Validity</th>
-                                            <th><i class="fas fa-check-circle me-1"></i>Status</th>
-                                            <th class="text-end"><i class="fas fa-cog me-1"></i>Actions</th>
+                                            <th><i class="fa fa-tag me-1"></i>Profile Name</th>
+                                            <th><i class="fa fa-layer-group me-1"></i>Type</th>
+                                            <th><i class="fa fa-tachometer-alt me-1"></i>Rate Limit</th>
+                                            <th><i class="fa fa-users me-1"></i>Shared Users</th>
+                                            <th><i class="fa fa-money-bill me-1"></i>Price</th>
+                                            <th><i class="fa fa-clock me-1"></i>Validity</th>
+                                            <th><i class="fa fa-check-circle me-1"></i>Status</th>
+                                            <th class="text-end"><i class="fa fa-cog me-1"></i>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -280,8 +279,8 @@ function mergeProfile($routerProfile, $type, $dbIndex)
                                                 <td>
                                                     <div class="d-flex align-items-center">
                                                         <div class="avatar avatar-sm me-2">
-                                                            <div class="avatar-title bg-<?= $p['type']=='pppoe'?'info':'secondary' ?>-soft text-<?= $p['type']=='pppoe'?'info':'secondary' ?> rounded-circle">
-                                                                <i class="fas fa-box"></i>
+                                                            <div class="avatar-title bg-<?= $p['type'] == 'pppoe' ? 'info' : 'secondary' ?>-soft text-<?= $p['type'] == 'pppoe' ? 'info' : 'secondary' ?> rounded-circle">
+                                                                <i class="fa fa-box"></i>
                                                             </div>
                                                         </div>
                                                         <strong><?= htmlspecialchars($p['name']) ?></strong>
@@ -290,7 +289,7 @@ function mergeProfile($routerProfile, $type, $dbIndex)
 
                                                 <td>
                                                     <span class="badge bg-<?= $p['type'] == 'pppoe' ? 'info' : 'secondary' ?>-soft text-<?= $p['type'] == 'pppoe' ? 'info' : 'secondary' ?>">
-                                                        <i class="fas fa-<?= $p['type'] == 'pppoe' ? 'network-wired' : 'wifi' ?> me-1"></i>
+                                                        <i class="fa fa-<?= $p['type'] == 'pppoe' ? 'network-wired' : 'wifi' ?> me-1"></i>
                                                         <?= strtoupper($p['type']) ?>
                                                     </span>
                                                 </td>
@@ -316,7 +315,7 @@ function mergeProfile($routerProfile, $type, $dbIndex)
                                                 <td>
                                                     <?php if ($p['price'] !== '—'): ?>
                                                         <strong class="text-success">
-                                                            <i class="fas fa-money-bill-wave me-1"></i>
+                                                            <i class="fa fa-money-bill-wave me-1"></i>
                                                             KES <?= number_format($p['price'], 2) ?>
                                                         </strong>
                                                     <?php else: ?>
@@ -327,7 +326,7 @@ function mergeProfile($routerProfile, $type, $dbIndex)
                                                 <td>
                                                     <?php if ($p['validity'] !== '—'): ?>
                                                         <span class="badge bg-warning-soft text-warning">
-                                                            <i class="fas fa-calendar me-1"></i>
+                                                            <i class="fa fa-calendar me-1"></i>
                                                             <?= $p['validity'] ?>
                                                         </span>
                                                     <?php else: ?>
@@ -338,18 +337,18 @@ function mergeProfile($routerProfile, $type, $dbIndex)
                                                 <td>
                                                     <?php if ($p['in_db']): ?>
                                                         <span class="badge bg-success">
-                                                            <i class="fas fa-check-circle me-1"></i>Configured
+                                                            <i class="fa fa-check-circle me-1"></i>Configured
                                                         </span>
                                                     <?php else: ?>
                                                         <span class="badge bg-warning">
-                                                            <i class="fas fa-exclamation-triangle me-1"></i>Router Only
+                                                            <i class="fa fa-exclamation-triangle me-1"></i>Router Only
                                                         </span>
                                                     <?php endif; ?>
                                                 </td>
 
                                                 <td class="text-end">
                                                     <div class="btn-group btn-group-sm">
-                                                        <button class="btn btn-outline-primary view-profile"
+                                                        <button type="button" class="btn btn-outline-primary view-profile"
                                                             data-name="<?= htmlspecialchars($p['name']) ?>"
                                                             data-type="<?= $p['type'] ?>"
                                                             data-rate="<?= htmlspecialchars($p['rate_limit']) ?>"
@@ -358,10 +357,10 @@ function mergeProfile($routerProfile, $type, $dbIndex)
                                                             data-validity="<?= $p['validity'] ?>"
                                                             data-router="<?= $selected_router ?>"
                                                             title="View Details">
-                                                            <i class="fas fa-eye"></i>
+                                                            <i class="fa fa-eye"></i>
                                                         </button>
 
-                                                        <button class="btn btn-outline-secondary edit-profile"
+                                                        <button type="button" class="btn btn-outline-secondary edit-profile"
                                                             data-name="<?= htmlspecialchars($p['name']) ?>"
                                                             data-type="<?= $p['type'] ?>"
                                                             data-rate="<?= htmlspecialchars($p['rate_limit']) ?>"
@@ -370,15 +369,15 @@ function mergeProfile($routerProfile, $type, $dbIndex)
                                                             data-validity="<?= $p['validity'] ?>"
                                                             data-router="<?= $selected_router ?>"
                                                             title="Edit Profile">
-                                                            <i class="fas fa-edit"></i>
+                                                            <i class="fa fa-edit"></i>
                                                         </button>
 
-                                                        <button class="btn btn-outline-danger delete-profile"
+                                                        <button type="button" class="btn btn-outline-danger delete-profile"
                                                             data-name="<?= htmlspecialchars($p['name']) ?>"
                                                             data-type="<?= $p['type'] ?>"
                                                             data-router="<?= $selected_router ?>"
                                                             title="Delete Profile">
-                                                            <i class="fas fa-trash"></i>
+                                                            <i class="fa fa-trash"></i>
                                                         </button>
                                                     </div>
                                                 </td>
@@ -409,25 +408,25 @@ function mergeProfile($routerProfile, $type, $dbIndex)
     </div>
 
     <?php require_once "../partials/scripts.php"; ?>
-    
+
     <!-- Enhanced Modals -->
     <?php include "modals.php"; ?>
 
     <!-- Filter and Action Scripts -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            
+
             // Filter functionality
             const filterButtons = document.querySelectorAll("[data-filter]");
-            
+
             filterButtons.forEach(btn => {
                 btn.addEventListener("click", () => {
                     const filter = btn.dataset.filter;
-                    
+
                     // Update active button
                     filterButtons.forEach(b => b.classList.remove("active"));
                     btn.classList.add("active");
-                    
+
                     // Filter using Simple-DataTables
                     const table = document.getElementById("datatablesSimple");
                     if (table && table.datatable) {
@@ -462,10 +461,18 @@ function mergeProfile($routerProfile, $type, $dbIndex)
                     const btn = e.target.closest('.edit-profile');
 
                     set('edit-name', btn.dataset.name);
+                    set('edit-type', btn.dataset.type);
                     set('edit-rate', btn.dataset.rate);
                     set('edit-shared', btn.dataset.shared);
                     set('edit-price', btn.dataset.price);
-                    set('edit-validity', btn.dataset.validity);
+                    let v = btn.dataset.validity; // "30d 0h"
+
+                    if (v !== '—') {
+                        let parts = v.split(' ');
+                        set('edit-validity-days', parseInt(parts[0]));
+                        set('edit-validity-hours', parseInt(parts[1]));
+                    }
+
                     set('edit-router', btn.dataset.router);
 
                     new bootstrap.Modal('#editProfileModal').show();
@@ -478,6 +485,7 @@ function mergeProfile($routerProfile, $type, $dbIndex)
 
                     set('delete-name', btn.dataset.name);
                     set('delete-router', btn.dataset.router);
+                    set('delete-type', btn.dataset.type);
                     document.getElementById('delete-profile-name').innerText = btn.dataset.name;
 
                     new bootstrap.Modal('#deleteProfileModal').show();

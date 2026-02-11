@@ -162,128 +162,165 @@ try {
 
 
 
-/* =================================================
+    /* =================================================
    REMOVE ACTIVE SESSION
 ================================================= */
 
-$active = new Query('/ip/hotspot/active/print');
-$active->where('user', $username);
+    $active = new Query('/ip/hotspot/active/print');
+    $active->where('user', $username);
 
-$actives = routerQuery($client, $active);
+    $actives = routerQuery($client, $active);
 
-foreach ($actives as $a) {
+    foreach ($actives as $a) {
 
-    $remove = new Query('/ip/hotspot/active/remove');
-    $remove->equal('.id', $a['.id']);
+        $remove = new Query('/ip/hotspot/active/remove');
+        $remove->equal('.id', $a['.id']);
 
-    routerQuery($client, $remove);
-}
+        routerQuery($client, $remove);
+    }
 
-logMsg("router", "Active sessions cleared");
+    logMsg("router", "Active sessions cleared");
 
 
-/* =================================================
+    /* =================================================
    REMOVE HOST CACHE (VERY IMPORTANT)
 ================================================= */
-$macRouter = strtoupper(implode(":", str_split(substr($username,4),2)));
+    $macRouter = strtoupper(implode(":", str_split(substr($username, 4), 2)));
 
-$host = new Query('/ip/hotspot/host/print');
-$host->where('mac-address', $macRouter);
+    $host = new Query('/ip/hotspot/host/print');
+    $host->where('mac-address', $macRouter);
 
-$hosts = routerQuery($client, $host);
+    $hosts = routerQuery($client, $host);
 
-foreach ($hosts as $h) {
+    foreach ($hosts as $h) {
 
-    $remove = new Query('/ip/hotspot/host/remove');
-    $remove->equal('.id', $h['.id']);
+        $remove = new Query('/ip/hotspot/host/remove');
+        $remove->equal('.id', $h['.id']);
 
-    routerQuery($client, $remove);
-}
+        routerQuery($client, $remove);
+    }
 
-logMsg("router", "Host cache cleared");
+    logMsg("router", "Host cache cleared");
 
 
-/* =================================================
+    /* =================================================
    DELETE OLD USER
 ================================================= */
 
-$check = new Query('/ip/hotspot/user/print');
-$check->where('name', $username);
+    $check = new Query('/ip/hotspot/user/print');
+    $check->where('name', $username);
 
-$users = routerQuery($client, $check);
+    $users = routerQuery($client, $check);
 
-foreach ($users as $u) {
+    foreach ($users as $u) {
 
-    $remove = new Query('/ip/hotspot/user/remove');
-    $remove->equal('.id', $u['.id']);
+        $remove = new Query('/ip/hotspot/user/remove');
+        $remove->equal('.id', $u['.id']);
 
-    routerQuery($client, $remove);
-}
+        routerQuery($client, $remove);
+    }
 
-logMsg("router", "Old user removed");
+    logMsg("router", "Old user removed");
 
 
-/* =================================================
+    /* =================================================
    CREATE NEW USER
 ================================================= */
 
-$add = new Query('/ip/hotspot/user/add');
-$add->equal('name', $username);
-$add->equal('password', $password);
-$add->equal('profile', $plan['profile_name']);
-$add->equal('comment', 'Paid ' . date("Y-m-d H:i"));
+    $add = new Query('/ip/hotspot/user/add');
+    $add->equal('name', $username);
+    $add->equal('password', $password);
+    $add->equal('profile', $plan['profile_name']);
+    $add->equal('comment', 'Paid ' . date("Y-m-d H:i"));
 
-if ($limit) {
-    $add->equal('limit-uptime', $limit);
-}
+    if ($limit) {
+        $add->equal('limit-uptime', $limit);
+    }
 
-routerQuery($client, $add);
+    routerQuery($client, $add);
 
-logMsg("router", "User created");
+    logMsg("router", "User created");
 
 
-/* =================================================
+    /* =================================================
    VERIFY USER EXISTS (CRITICAL)
 ================================================= */
 
-$verify = new Query('/ip/hotspot/user/print');
-$verify->where('name', $username);
+    $verify = new Query('/ip/hotspot/user/print');
+    $verify->where('name', $username);
 
-$result = routerQuery($client, $verify);
+    $result = routerQuery($client, $verify);
 
-if (empty($result)) {
-    throw new Exception("Router failed to create user");
-}
+    if (empty($result)) {
+        throw new Exception("Router failed to create user");
+    }
 
-/* =================================================
+    /* =================================================
+   ADD USER TO THE HOTSPOT USERS TABLE (CRITICAL)
+================================================= */
+
+    $start  = new DateTime();
+    $expire = clone $start;
+
+    if (!empty($plan['validity_hours'])) {
+        $expire->modify("+{$plan['validity_hours']} hours");
+    } elseif (!empty($plan['validity_days'])) {
+        $expire->modify("+{$plan['validity_days']} days");
+    }
+
+
+
+    $stmt = $pdo->prepare("
+    INSERT INTO hotspot_users
+    (router_id, plan_id, username, user_type, password, starts_at, expires_at, status)
+    VALUES (?, ?, ?, 'hotspot', ?, ?, ?, 'active')
+    ON DUPLICATE KEY UPDATE
+        plan_id    = VALUES(plan_id),
+        password   = VALUES(password),
+        starts_at  = VALUES(starts_at),
+        expires_at = VALUES(expires_at),
+        status     = 'active'
+");
+
+    $stmt->execute([
+        $payment['router_id'],
+        $payment['plan_id'],
+        $username,
+        $password,
+        $start->format('Y-m-d H:i:s'),
+        $expire->format('Y-m-d H:i:s')
+    ]);
+
+
+    /* =================================================
    MARK PAYMENT USED
 ================================================= */
 
 
-$mac = $username;
-$phone = $payment['phone'];
+    $mac = $username;
+    $phone = $payment['phone'];
 
-if(!empty($phone)){
+    if (!empty($phone)) {
 
-    $stmt = $pdo->prepare("
+        $stmt = $pdo->prepare("
         SELECT id FROM hotspot_devices
         WHERE mac=?
         LIMIT 1
     ");
-    $stmt->execute([$mac]);
+        $stmt->execute([$mac]);
 
-    $device = $stmt->fetch();
+        $device = $stmt->fetch();
 
-    if(!$device){
+        if (!$device) {
 
-        // save device
-        $pdo->prepare("
+            // save device
+            $pdo->prepare("
             INSERT INTO hotspot_devices (mac, phone, welcome_sms_sent)
             VALUES (?, ?, 1)
         ")->execute([$mac, $phone]);
 
 
-        $message = "PAY G WiFi Active ✅
+            $message = "PAY G WiFi Active ✅
 
 Check remaining time or reconnect:
 http://portal.inovatech.co.ke
@@ -291,31 +328,30 @@ http://portal.inovatech.co.ke
 Enjoy fast internet!
 - Inovatech";
 
-        sendSMS($phone, $message);
+            sendSMS($phone, $message);
 
-        logMsg("sms", "Welcome SMS sent to $phone");
+            logMsg("sms", "Welcome SMS sent to $phone");
+        }
     }
-}
 
 
 
-/* =================================================
+    /* =================================================
    MARK PAYMENT USED
 ================================================= */
 
-$pdo->prepare("
+    $pdo->prepare("
     UPDATE payments
     SET status='used',
         confirmed_at=NOW()
     WHERE payment_id=?
 ")->execute([$payment['payment_id']]);
 
-$pdo->commit();
+    $pdo->commit();
 
-logMsg("success", "USER: {$username} | TX: {$transaction_id}");
+    logMsg("success", "USER: {$username} | TX: {$transaction_id}");
 
-echo "OK";
-
+    echo "OK";
 } catch (Throwable $e) {
 
     $pdo->rollBack();
