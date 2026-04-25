@@ -1,7 +1,16 @@
 <?php
 session_start();
+
+// If user already logged in, go to dashboard
+if (isset($_SESSION['user'])) {
+    header("Location: ../dashboard/");
+    exit;
+}
+
+
 require_once "../partials/head.php";
 ?>
+
 <body class="bg-pattern-waihou">
     <!-- Layout wrapper -->
     <div id="layoutAuthentication">
@@ -27,15 +36,22 @@ require_once "../partials/head.php";
                                             <!-- Error message -->
                                             <?php if (!empty($_SESSION['error'])): ?>
                                                 <div class="alert alert-danger">
-                                                    <?= htmlspecialchars($_SESSION['error']); ?>
+                                                    <?= $_SESSION['error']; ?>
                                                 </div>
                                                 <?php unset($_SESSION['error']); ?>
+                                            <?php endif; ?>
+
+                                            <?php if (isset($_SESSION['success'])): ?>
+                                                <div class="alert alert-success">
+                                                    <?= $_SESSION['success'];
+                                                    unset($_SESSION['success']); ?>
+                                                </div>
                                             <?php endif; ?>
 
                                             <!-- Login form -->
                                             <form method="POST" action="process_login.php" class="mb-5">
                                                 <div class="mb-4">
-                                                    <input type="text" name="username" class="form-control" placeholder="Username" required>
+                                                    <input type="text" name="username" class="form-control" placeholder="Username or Email" required>
                                                 </div>
                                                 <div class="mb-4">
                                                     <input type="password" name="password" class="form-control" placeholder="Password" required>
@@ -49,21 +65,21 @@ require_once "../partials/head.php";
                                                 </div>
 
                                                 <div class="d-flex align-items-center justify-content-between mt-4">
-                                                    <a class="small fw-500 text-decoration-none" href="forgot-password.php">Forgot Password?</a>
+                                                    <a class="small fw-500 text-decoration-none" href="resetPassword">Forgot Password?</a>
                                                     <button type="submit" class="btn btn-primary">Login</button>
                                                 </div>
                                             </form>
 
                                             <!-- Footer text -->
-                                            <!-- <div class="text-center">
-                                                <a class="small fw-500 text-decoration-none" href="register.php">New user? Create an account</a>
-                                            </div> -->
+                                            <div class="text-center">
+                                                <a class="small fw-500 text-decoration-none" href="register">New user? Create an account</a>
+                                            </div>
                                         </div>
                                     </div>
 
                                     <!-- Background image column -->
                                     <div class="col-lg-7 col-md-6 d-none d-md-block"
-                                         style="background-image: url('../assets/img/bg1.jpg');
+                                        style="background-image: url('../assets/img/bg1.jpg');
                                                 background-size: cover;
                                                 background-repeat: no-repeat;
                                                 background-position: center;">
@@ -81,6 +97,7 @@ require_once "../partials/head.php";
         </div>
     </div>
 
-<?php require_once "../partials/scripts.php"; ?>
+    <?php require_once "../partials/scripts.php"; ?>
 </body>
+
 </html>

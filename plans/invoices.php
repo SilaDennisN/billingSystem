@@ -1,11 +1,13 @@
 <?php
 require_once "../core/db.php";
 require_once "../core/auth.php";
+require __DIR__ . '/../subscription/subscription_gate.php';
 
 if (!is_logged_in()) {
     header("Location: ../auth/login");
     exit;
 }
+check_subscription_gate($pdo, $user_id);
 
 /*
  REAL INVOICES
@@ -13,7 +15,7 @@ if (!is_logged_in()) {
  - Hotspot + PPPoE included
 */
 
-$invoices = $pdo->query("
+$invoices = $pdo->prepare("
     SELECT 
         i.*,
         hu.username,
@@ -24,8 +26,17 @@ $invoices = $pdo->query("
     JOIN hotspot_users hu ON hu.user_id = i.user_id
     JOIN hotspot_profiles hp ON hp.id = i.plan_id
     JOIN routers r ON r.router_id = i.router_id
+    WHERE EXISTS (
+        SELECT 1
+        FROM user_router_access ur
+        WHERE ur.router_id = i.router_id
+        AND ur.user_id = ?
+    )
     ORDER BY i.created_at DESC
-")->fetchAll();
+");
+
+$invoices->execute([$user_id]);
+$invoices = $invoices->fetchAll();
 
 // Calculate stats
 $totalInvoices = count($invoices);
@@ -74,8 +85,8 @@ foreach ($invoices as $i) {
                 <span class="badge bg-danger-soft text-danger">
                     <i class="fa fa-exclamation-circle me-1"></i><?= $overdueInvoices ?> Overdue
                 </span>
-                <button class="btn btn-sm btn-light" onclick="window.print()">
-                    <i class="fas fa-print me-1"></i>Export
+                <button class="btn btn-sm btn-light" onclick="window.location.replace('../cron/generate_pppoe_invoices')">
+                    <i class="fa fa-print me-1"></i>Generate Invoices
                 </button>
             </div>
         </div>
@@ -95,7 +106,7 @@ foreach ($invoices as $i) {
                             <div class="h3 mb-0"><?= $totalInvoices ?></div>
                         </div>
                         <div class="ms-3">
-                            <i class="fas fa-file-invoice fa-2x text-primary opacity-50"></i>
+                            <i class="fa fa-file-invoice fa-2x text-primary opacity-50"></i>
                         </div>
                     </div>
                 </div>
@@ -111,7 +122,7 @@ foreach ($invoices as $i) {
                             <div class="h3 mb-0">KES <?= number_format($totalRevenue, 2) ?></div>
                         </div>
                         <div class="ms-3">
-                            <i class="fas fa-coins fa-2x text-success opacity-50"></i>
+                            <i class="fa fa-coins fa-2x text-success opacity-50"></i>
                         </div>
                     </div>
                 </div>
@@ -127,7 +138,7 @@ foreach ($invoices as $i) {
                             <div class="h3 mb-0">KES <?= number_format($pendingRevenue, 2) ?></div>
                         </div>
                         <div class="ms-3">
-                            <i class="fas fa-hourglass-half fa-2x text-warning opacity-50"></i>
+                            <i class="fa fa-hourglass-half fa-2x text-warning opacity-50"></i>
                         </div>
                     </div>
                 </div>
@@ -143,7 +154,7 @@ foreach ($invoices as $i) {
                             <div class="h3 mb-0"><?= $overdueInvoices ?></div>
                         </div>
                         <div class="ms-3">
-                            <i class="fas fa-exclamation-triangle fa-2x text-danger opacity-50"></i>
+                            <i class="fa fa-exclamation-triangle fa-2x text-danger opacity-50"></i>
                         </div>
                     </div>
                 </div>
@@ -156,7 +167,7 @@ foreach ($invoices as $i) {
         <div class="card-header bg-primary text-white">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <i class="fas fa-list me-2"></i>Invoice List
+                    <i class="fa fa-list me-2"></i>Invoice List
                 </div>
                 <div class="btn-group btn-group-sm">
                     <button class="btn btn-light btn-sm active" data-status="all">
@@ -180,15 +191,15 @@ foreach ($invoices as $i) {
                 <table id="datatablesSimple" class="table table-hover align-middle mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th><i class="fas fa-hashtag me-1"></i>Invoice #</th>
-                            <th><i class="fas fa-user me-1"></i>User</th>
-                            <th><i class="fas fa-tag me-1"></i>Type</th>
-                            <th><i class="fas fa-server me-1"></i>Router</th>
-                            <th><i class="fas fa-box me-1"></i>Plan</th>
-                            <th><i class="fas fa-money-bill me-1"></i>Amount</th>
-                            <th><i class="fas fa-calendar-alt me-1"></i>Period</th>
-                            <th><i class="fas fa-check-circle me-1"></i>Status</th>
-                            <th class="text-end"><i class="fas fa-cog me-1"></i>Actions</th>
+                            <th><i class="fa fa-hashtag me-1"></i>Invoice #</th>
+                            <th><i class="fa fa-user me-1"></i>User</th>
+                            <th><i class="fa fa-tag me-1"></i>Type</th>
+                            <th><i class="fa fa-server me-1"></i>Router</th>
+                            <th><i class="fa fa-box me-1"></i>Plan</th>
+                            <th><i class="fa fa-money-bill me-1"></i>Amount</th>
+                            <th><i class="fa fa-calendar-alt me-1"></i>Period</th>
+                            <th><i class="fa fa-check-circle me-1"></i>Status</th>
+                            <th class="text-end"><i class="fa fa-cog me-1"></i>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -210,7 +221,7 @@ foreach ($invoices as $i) {
                                     <div class="d-flex align-items-center">
                                         <div class="avatar avatar-sm me-2">
                                             <div class="avatar-title bg-<?= $i['user_type']=='pppoe'?'info':'secondary' ?>-soft text-<?= $i['user_type']=='pppoe'?'info':'secondary' ?> rounded-circle">
-                                                <i class="fas fa-user"></i>
+                                                <i class="fa fa-user"></i>
                                             </div>
                                         </div>
                                         <strong><?= htmlspecialchars($i['username']) ?></strong>
@@ -219,7 +230,7 @@ foreach ($invoices as $i) {
 
                                 <td>
                                     <span class="badge bg-<?= $i['user_type']=='pppoe' ? 'info' : 'warning' ?>-soft text-<?= $i['user_type']=='pppoe' ? 'info' : 'warning' ?>">
-                                        <i class="fas fa-<?= $i['user_type']=='pppoe'?'network-wired':'rss' ?> me-1"></i>
+                                        <i class="fa fa-<?= $i['user_type']=='pppoe'?'network-wired':'rss' ?> me-1"></i>
                                         <?= strtoupper($i['user_type']) ?>
                                     </span>
                                 </td>
@@ -252,15 +263,15 @@ foreach ($invoices as $i) {
                                 <td>
                                     <?php if ($i['status'] === 'paid'): ?>
                                         <span class="badge bg-success">
-                                            <i class="fas fa-check-circle me-1"></i>Paid
+                                            <i class="fa fa-check-circle me-1"></i>Paid
                                         </span>
                                     <?php elseif ($i['status'] === 'overdue'): ?>
                                         <span class="badge bg-danger">
-                                            <i class="fas fa-exclamation-circle me-1"></i>Overdue
+                                            <i class="fa fa-exclamation-circle me-1"></i>Overdue
                                         </span>
                                     <?php elseif ($i['status'] === 'unpaid'): ?>
                                         <span class="badge bg-warning">
-                                            <i class="fas fa-hourglass-half me-1"></i>Unpaid
+                                            <i class="fa fa-hourglass-half me-1"></i>Unpaid
                                         </span>
                                     <?php else: ?>
                                         <span class="badge bg-secondary">
@@ -274,13 +285,13 @@ foreach ($invoices as $i) {
                                         <a href="invoiceview?id=<?= $i['invoice_id'] ?>" 
                                            class="btn btn-outline-primary" 
                                            title="View Invoice">
-                                            <i class="fas fa-eye"></i>
+                                            <i class="fa fa-eye"></i>
                                         </a>
 
                                         <button class="btn btn-outline-secondary print-invoice" 
                                                 data-id="<?= $i['invoice_id'] ?>" 
                                                 title="Print Invoice">
-                                            <i class="fas fa-print"></i>
+                                            <i class="fa fa-print"></i>
                                         </button>
 
                                         <?php if ($i['status'] !== 'paid'): ?>
@@ -291,14 +302,14 @@ foreach ($invoices as $i) {
                                                 data-invoice="<?= htmlspecialchars($i['invoice_number']) ?>"
                                                 data-amount="<?= $i['amount'] ?>"
                                                 title="Pay Invoice">
-                                                <i class="fas fa-credit-card"></i>
+                                                <i class="fa fa-credit-card"></i>
                                             </button>
                                         <?php endif; ?>
 
                                         <button class="btn btn-outline-info send-invoice" 
                                                 data-id="<?= $i['invoice_id'] ?>" 
                                                 title="Send via Email">
-                                            <i class="fas fa-envelope"></i>
+                                            <i class="fa fa-envelope"></i>
                                         </button>
                                     </div>
                                 </td>
@@ -313,7 +324,7 @@ foreach ($invoices as $i) {
             <!-- Empty State -->
             <?php if (empty($invoices)): ?>
                 <div class="text-center py-5">
-                    <i class="fas fa-file-invoice fa-3x text-muted mb-3"></i>
+                    <i class="fa fa-file-invoice fa-3x text-muted mb-3"></i>
                     <p class="text-muted">No invoices found</p>
                 </div>
             <?php endif; ?>
@@ -336,7 +347,7 @@ foreach ($invoices as $i) {
             <form method="POST" action="invoicespay.php">
                 <div class="modal-header bg-success text-white">
                     <h5 class="modal-title">
-                        <i class="fas fa-credit-card me-2"></i>Pay Invoice
+                        <i class="fa fa-credit-card me-2"></i>Pay Invoice
                     </h5>
                     <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
@@ -345,13 +356,13 @@ foreach ($invoices as $i) {
                     <input type="hidden" name="invoice_id" id="pay-invoice-id">
 
                     <div class="alert alert-info mb-3">
-                        <i class="fas fa-info-circle me-2"></i>
+                        <i class="fa fa-info-circle me-2"></i>
                         Invoice: <strong id="pay-invoice-number"></strong>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">
-                            <i class="fas fa-money-bill-wave me-1"></i>Amount
+                            <i class="fa fa-money-bill-wave me-1"></i>Amount
                         </label>
                         <div class="input-group">
                             <span class="input-group-text">KES</span>
@@ -361,7 +372,7 @@ foreach ($invoices as $i) {
 
                     <div class="mb-3">
                         <label class="form-label">
-                            <i class="fas fa-credit-card me-1"></i>Payment Method
+                            <i class="fa fa-credit-card me-1"></i>Payment Method
                         </label>
                         <select name="payment_method" class="form-select">
                             <option value="mpesa">M-Pesa</option>
@@ -373,7 +384,7 @@ foreach ($invoices as $i) {
 
                     <div class="mb-3">
                         <label class="form-label">
-                            <i class="fas fa-sticky-note me-1"></i>Notes (Optional)
+                            <i class="fa fa-sticky-note me-1"></i>Notes (Optional)
                         </label>
                         <textarea name="notes" class="form-control" rows="2" placeholder="Add payment notes..."></textarea>
                     </div>
@@ -381,10 +392,10 @@ foreach ($invoices as $i) {
 
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">
-                        <i class="fas fa-times me-1"></i>Cancel
+                        <i class="fa fa-times me-1"></i>Cancel
                     </button>
                     <button type="submit" class="btn btn-success">
-                        <i class="fas fa-check me-1"></i>Confirm Payment
+                        <i class="fa fa-check me-1"></i>Confirm Payment
                     </button>
                 </div>
             </form>

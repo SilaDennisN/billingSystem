@@ -1,6 +1,9 @@
 {
     "require": {
-        "evilfreelancer/routeros-api-php": "^1.6"
+        "evilfreelancer/routeros-api-php": "^1.6",
+        "phpmailer/phpmailer": "^7.0",
+        "phpseclib/phpseclib": "^3.0",
+        "cboden/ratchet": "^0.4.4"
 }
 
 }

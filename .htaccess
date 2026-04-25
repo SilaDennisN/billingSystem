@@ -3,12 +3,13 @@ RewriteEngine On
 # Prevent directory listing
 Options -Indexes
 
-# Allow access to existing files and folders
+# Allow existing files and directories through as-is
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# Remove .php extension
+# Remove .php extension — but ONLY for URLs that don't already end in .php
+RewriteCond %{REQUEST_URI} !\.php$
 RewriteRule ^(.+)$ $1.php [L,QSA]
 
 <Files "deploy.php">
@@ -19,3 +20,7 @@ RewriteRule ^(.+)$ $1.php [L,QSA]
     Require all denied
 </Files>
 
+<Files "subscription_payment_config.php">
+    Order allow,deny
+    Deny from all
+</Files>

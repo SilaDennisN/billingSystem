@@ -13,6 +13,6 @@ $stmt->execute([$token]);
 
 $status = $stmt->fetchColumn();
 
-if ($status === 'active' || $status === 'used') {
+if ($status === 'used') {
     echo "ACTIVE";
 }

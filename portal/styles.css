@@ -24,7 +24,10 @@ body {
 
 /* Main Card */
 .card {
-    background: #ffffff;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 16px;
     padding: 25px 20px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.2);
@@ -35,12 +38,12 @@ body {
 .card h2 {
     margin-bottom: 5px;
     font-size: 22px;
-    color: #0f2027;
+    color: #ffffff;
 }
 
 .subtitle {
     font-size: 14px;
-    color: #666;
+    color: #e0e0e0;
     margin-bottom: 20px;
 }
 
@@ -52,7 +55,10 @@ body {
 }
 
 .plan {
-    border: 2px solid #e0e0e0;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 2px solid rgba(255, 255, 255, 0.2);
     border-radius: 12px;
     padding: 15px;
     transition: all 0.3s ease;
@@ -60,27 +66,29 @@ body {
 }
 
 .plan:hover {
-    border-color: #2c5364;
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.4);
     transform: scale(1.02);
-    box-shadow: 0 4px 12px rgba(44, 83, 100, 0.2);
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
 }
 
 /* Plan content */
 .plan h3 {
     font-size: 18px;
     margin-bottom: 5px;
+    color: #ffffff;
 }
 
 .price {
     font-size: 20px;
     font-weight: bold;
-    color: #2c5364;
+    color: #ffffff;
     margin-bottom: 5px;
 }
 
 .validity {
     font-size: 13px;
-    color: #777;
+    color: #e0e0e0;
     margin-bottom: 12px;
 }
 

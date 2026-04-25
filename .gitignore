@@ -3,6 +3,8 @@ node_modules/
 
 # Ignore environment files
 .env
+app.php
+storeApi.php
 
 # Ignore logs
 *.log
@@ -15,3 +17,4 @@ routeros_api_class.php
 # Ignore a folder
 uploads/
 cache/
+deploy*

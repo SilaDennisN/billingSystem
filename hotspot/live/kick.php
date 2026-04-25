@@ -18,7 +18,6 @@ function routerQuery($client, Query $query)
     return $response;
 }
 
-
 // Ensure user is logged in
 if (!is_logged_in()) {
     header("Location: /auth/login");
@@ -33,13 +32,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $router_id = $_POST['router_id'] ?? null;
 $username  = $_POST['username'] ?? null;
+$user_type = $_POST['user_type'] ?? 'hotspot';
 
 if (!$router_id || !$username) {
     http_response_code(400);
     exit("Missing router_id or username");
 }
-
-
 
 try {
     // Connect to router
@@ -48,43 +46,75 @@ try {
         throw new Exception("Failed to connect to router");
     }
 
-    // 1. Remove active sessions
-    $active = new Query('/ip/hotspot/active/print');
-    $active->where('user', $username);
-    $actives = routerQuery($client, $active);
+    if ($user_type === 'pppoe') {
+        // Handle PPPoE disconnect
+        $active = new Query('/ppp/active/print');
+        $active->where('name', $username);
+        $actives = routerQuery($client, $active);
 
-    foreach ($actives as $a) {
-        $remove = new Query('/ip/hotspot/active/remove');
-        $remove->equal('.id', $a['.id']);
-        routerQuery($client, $remove);
+        foreach ($actives as $a) {
+            $remove = new Query('/ppp/active/remove');
+            $remove->equal('.id', $a['.id']);
+            routerQuery($client, $remove);
+        }
+        
+        $message = "PPPoE user $username disconnected";
+        
+    } elseif ($user_type === 'captive') {
+        // Handle captive portal disconnect (by MAC)
+        $mac_router = strtoupper(str_replace(':', '', $username));
+        
+        // Remove from hotspot active
+        $active = new Query('/ip/hotspot/active/print');
+        $actives = routerQuery($client, $active);
+        
+        foreach ($actives as $a) {
+            if (isset($a['mac-address']) && strtoupper(str_replace(':', '', $a['mac-address'])) === $mac_router) {
+                $remove = new Query('/ip/hotspot/active/remove');
+                $remove->equal('.id', $a['.id']);
+                routerQuery($client, $remove);
+                break;
+            }
+        }
+        
+        // Remove from host cache
+        $host = new Query('/ip/hotspot/host/print');
+        $hosts = routerQuery($client, $host);
+        
+        foreach ($hosts as $h) {
+            if (isset($h['mac-address']) && strtoupper(str_replace(':', '', $h['mac-address'])) === $mac_router) {
+                $remove = new Query('/ip/hotspot/host/remove');
+                $remove->equal('.id', $h['.id']);
+                routerQuery($client, $remove);
+                break;
+            }
+        }
+        
+        $message = "Captive portal session for MAC $username disconnected";
+        
+    } else {
+        // Handle Hotspot disconnect (by username)
+        // 1. Remove active sessions
+        $active = new Query('/ip/hotspot/active/print');
+        $active->where('user', $username);
+        $actives = routerQuery($client, $active);
+
+        foreach ($actives as $a) {
+            $remove = new Query('/ip/hotspot/active/remove');
+            $remove->equal('.id', $a['.id']);
+            routerQuery($client, $remove);
+        }
+
+        // 2. Clear host cache (optional - for completeness)
+        // This requires MAC address which we don't have, so we skip
+        
+        $message = "Hotspot user $username disconnected";
     }
 
-    // 2. Clear host cache
-    $macRouter = strtoupper(implode(":", str_split(substr($username, 4), 2)));
-    $host = new Query('/ip/hotspot/host/print');
-    $host->where('mac-address', $macRouter);
-    $hosts = routerQuery($client, $host);
-
-    foreach ($hosts as $h) {
-        $remove = new Query('/ip/hotspot/host/remove');
-        $remove->equal('.id', $h['.id']);
-        routerQuery($client, $remove);
-    }
-
-    // 3. (Optional) Remove hotspot user entirely
-    // $check = new Query('/ip/hotspot/user/print');
-    // $check->where('name', $username);
-    // $users = routerQuery($client, $check);
-    // foreach ($users as $u) {
-    //     $remove = new Query('/ip/hotspot/user/remove');
-    //     $remove->equal('.id', $u['.id']);
-    //     routerQuery($client, $remove);
-    // }
-
-    header("Location: ../live.php?message=User+$username+disconnected");
+    header("Location: ../index.php?success=" . urlencode($message));
     exit;
 
 } catch (Throwable $e) {
-    header("Location: ../live.php?error=" . urlencode($e->getMessage()));
+    header("Location: ../index.php?error=" . urlencode($e->getMessage()));
     exit;
 }

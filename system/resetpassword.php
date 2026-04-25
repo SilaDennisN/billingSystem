@@ -1,9 +1,9 @@
 <?php
 require_once "../core/db.php";
 require_once "../core/auth.php";
-require_once "../core/config.php";
+require_once "../config/config.php";
 
-if (!is_logged_in() || $_SESSION['role'] !== 'admin') {
+if (!is_logged_in() || $_SESSION['user']['role'] !== 'admin') {
     http_response_code(403);
     exit("Access denied");
 }
@@ -25,5 +25,5 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([$newHash, $targetUserId]);
 
-header("Location: users.php?reset=success");
+header("Location: users?reset=success");
 exit;

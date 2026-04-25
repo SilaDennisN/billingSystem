@@ -1,32 +1,74 @@
 <?php
 require_once "../core/db.php";
 require_once "../core/auth.php";
+require __DIR__ . '/../subscription/subscription_gate.php';
 
-if (!is_logged_in() || $_SESSION['user']['role'] !== 'admin') {
-    header("Location: ../dashboard");
+if (!is_logged_in()) {
+    header("Location: ../auth/login");
     exit;
 }
+check_subscription_gate($pdo, $user_id);
 
-$users = $pdo->query("
-    SELECT user_id, username, email, role, status, last_login, created_at
-    FROM users
-    ORDER BY created_at DESC
-")->fetchAll();
+
+$me = (int)$_SESSION['user']['id'];
+
+/* ── Get routers assigned to the logged-in admin ── */
+$myRouterStmt = $pdo->prepare("
+    SELECT router_id FROM user_router_access WHERE user_id = ?
+");
+$myRouterStmt->execute([$me]);
+$myRouterIds = $myRouterStmt->fetchAll(PDO::FETCH_COLUMN);
+
+/* ── Fetch users who share at least one router with me, excluding myself ── */
+if (!empty($myRouterIds)) {
+    $ph = implode(',', array_fill(0, count($myRouterIds), '?'));
+    $stmt = $pdo->prepare("
+        SELECT DISTINCT u.user_id, u.username, u.email, u.role, u.status, u.last_login, u.created_at
+        FROM users u
+        INNER JOIN user_router_access ura ON ura.user_id = u.user_id
+        WHERE ura.router_id IN ($ph)
+        ORDER BY u.created_at DESC
+    ");
+    $stmt->execute($myRouterIds);
+} else {
+    /* Admin has no routers — show nobody except self */
+    $stmt = $pdo->prepare("SELECT user_id, username, email, role, status, last_login, created_at FROM users WHERE user_id = ?");
+    $stmt->execute([$me]);
+}
+
+$users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+/* ── Fetch all active routers (for the assign-routers modal) ── */
+$allRouters = $pdo->query("SELECT router_id, name FROM routers WHERE status='active' ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+
+/* ── Per-user router assignments (for display & edit pre-fill) ── */
+$assignStmt = $pdo->query("SELECT user_id, router_id FROM user_router_access");
+$allAssignments = $assignStmt->fetchAll(PDO::FETCH_ASSOC);
+$assignMap = [];
+foreach ($allAssignments as $a) {
+    $assignMap[$a['user_id']][] = (int)$a['router_id'];
+}
 ?>
-<?php if (isset($_GET['reset']) && $_GET['reset'] === 'success'): ?>
+<?php if (isset($_GET['success'])): ?>
 <div class="alert alert-success alert-dismissible fade show mx-5 mt-3" role="alert">
-    <div class="d-flex align-items-center">
-        <i class="material-icons me-2">check_circle</i>
-        <div>User password reset to default successfully.</div>
-    </div>
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    <i class="fa fa-check-circle me-2"></i>
+    <?php
+    $msgs = [
+        'created' => 'User created successfully.',
+        'updated' => 'User updated successfully.',
+        'deleted' => 'User deleted.',
+        'reset'   => 'Password reset to default successfully.',
+        'toggled' => 'User status updated.',
+    ];
+    echo $msgs[$_GET['success']] ?? 'Action completed.';
+    ?>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 <?php endif; ?>
 
 <?php require_once "../partials/head.php"; ?>
 
 <body class="nav-fixed bg-light">
-
     <?php require_once "../partials/topnav.php"; ?>
 
     <div id="layoutDrawer">
@@ -35,266 +77,294 @@ $users = $pdo->query("
         <div id="layoutDrawer_content">
             <main>
 
-                <header class="bg-primary">
-                    <div class="container-xl px-1">
-                        <div class="d-flex align-items-center justify-content-between py-4">
-                            <div>
-                                <h1 class="text-white mb-1 display-6">System Users</h1>
-                                <p class="text-white-50 mb-0">Manage user accounts and permissions</p>
+                <!-- Header -->
+                <header style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 60%,#0f3460 100%);border-bottom:3px solid #3b82f6;">
+                    <div class="container-xl px-5 py-4">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center gap-3">
+                                <div style="width:46px;height:46px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.4);border-radius:10px;display:flex;align-items:center;justify-content:center;">
+                                    <i class="fa fa-users" style="color:#60a5fa;font-size:1.2rem;"></i>
+                                </div>
+                                <div>
+                                    <h1 class="text-white mb-0" style="font-size:1.4rem;font-weight:700;">System Users</h1>
+                                    <p class="mb-0" style="color:rgba(255,255,255,0.5);font-size:0.78rem;">Users sharing your router assignments</p>
+                                </div>
                             </div>
-                            <div>
-                                <i class="material-icons text-white-50" style="font-size: 3rem;">people</i>
-                            </div>
+                            <button class="btn btn-sm px-3 py-2"
+                                style="background:rgba(59,130,246,0.2);color:#93c5fd;border:1px solid rgba(59,130,246,0.35);border-radius:8px;font-size:0.82rem;font-weight:600;"
+                                data-bs-toggle="modal" data-bs-target="#addUserModal">
+                                <i class="fa fa-plus me-2"></i>Add User
+                            </button>
                         </div>
                     </div>
                 </header>
 
-                <div class="container-xl px-1 mt-n4">
+                <div class="container-xl px-4 py-4">
 
-                    <!-- Stats Cards -->
+                    <!-- Stat cards -->
                     <div class="row g-3 mb-4">
-                        <div class="col-md-3">
-                            <div class="card shadow-sm border-0 h-100">
-                                <div class="card-body">
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <div>
-                                            <div class="text-muted small mb-1">Total Users</div>
-                                            <div class="h3 mb-0"><?= count($users) ?></div>
-                                        </div>
-                                        <div class="text-primary">
-                                            <i class="material-icons" style="font-size: 2.5rem;">group</i>
+                        <?php
+                        $total    = count($users);
+                        $active   = count(array_filter($users, fn($u) => $u['status'] === 'active'));
+                        $admins   = count(array_filter($users, fn($u) => $u['role'] === 'admin'));
+                        $inactive = $total - $active;
+                        $stats = [
+                            ['label'=>'Total Users',   'val'=>$total,    'icon'=>'fa-users',               'bg'=>'#eff6ff','ic'=>'#3b82f6'],
+                            ['label'=>'Active',        'val'=>$active,   'icon'=>'fa-circle-check',        'bg'=>'#f0fdf4','ic'=>'#22c55e'],
+                            ['label'=>'Admins',        'val'=>$admins,   'icon'=>'fa-user-shield',         'bg'=>'#fffbeb','ic'=>'#f59e0b'],
+                            ['label'=>'Inactive',      'val'=>$inactive, 'icon'=>'fa-ban',                 'bg'=>'#fef2f2','ic'=>'#ef4444'],
+                        ];
+                        foreach ($stats as $s): ?>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 h-100" style="border-radius:12px;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,0.07);">
+                                <div class="card-body p-4">
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.7px;color:#94a3b8;"><?= $s['label'] ?></span>
+                                        <div style="width:32px;height:32px;border-radius:8px;background:<?= $s['bg'] ?>;display:flex;align-items:center;justify-content:center;">
+                                            <i class="fa <?= $s['icon'] ?>" style="color:<?= $s['ic'] ?>;font-size:0.8rem;"></i>
                                         </div>
                                     </div>
+                                    <div style="font-size:2rem;font-weight:800;color:#1e293b;line-height:1;"><?= $s['val'] ?></div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
-                            <div class="card shadow-sm border-0 h-100">
-                                <div class="card-body">
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <div>
-                                            <div class="text-muted small mb-1">Active Users</div>
-                                            <div class="h3 mb-0"><?= count(array_filter($users, fn($u) => $u['status'] == 'active')) ?></div>
-                                        </div>
-                                        <div class="text-success">
-                                            <i class="material-icons" style="font-size: 2.5rem;">check_circle</i>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="card shadow-sm border-0 h-100">
-                                <div class="card-body">
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <div>
-                                            <div class="text-muted small mb-1">Administrators</div>
-                                            <div class="h3 mb-0"><?= count(array_filter($users, fn($u) => $u['role'] == 'admin')) ?></div>
-                                        </div>
-                                        <div class="text-warning">
-                                            <i class="material-icons" style="font-size: 2.5rem;">admin_panel_settings</i>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="card shadow-sm border-0 h-100">
-                                <div class="card-body">
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <div>
-                                            <div class="text-muted small mb-1">Inactive Users</div>
-                                            <div class="h3 mb-0"><?= count(array_filter($users, fn($u) => $u['status'] != 'active')) ?></div>
-                                        </div>
-                                        <div class="text-danger">
-                                            <i class="material-icons" style="font-size: 2.5rem;">block</i>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <?php endforeach; ?>
                     </div>
 
-                    <!-- Users Table Card -->
-                    <div class="card shadow border-0">
-                        <div class="card-header bg-white d-flex align-items-center justify-content-between py-3">
-                            <div>
-                                <h5 class="card-title mb-0">All Users</h5>
-                                <small class="text-muted">View and manage system users</small>
-                            </div>
-                            <button class="btn btn-primary btn-sm lift" data-bs-toggle="modal" data-bs-target="#addUserModal">
-                                <i class="material-icons me-1" style="font-size: 1rem; vertical-align: middle;">add</i>
-                                Add User
-                            </button>
+                    <!-- Table card -->
+                    <div class="card border-0" style="border-radius:12px;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,0.07);overflow:hidden;">
+
+                        <div class="card-header d-flex align-items-center justify-content-between py-3 px-4" style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+                            <span style="font-weight:700;color:#1e293b;font-size:0.9rem;">
+                                <i class="fa fa-list me-2" style="color:#94a3b8;"></i>User List
+                            </span>
+                            <span style="font-size:0.75rem;color:#94a3b8;">
+                                <?= $total ?> user<?= $total != 1 ? 's' : '' ?> · Updated <?= date('d M Y H:i') ?>
+                            </span>
                         </div>
 
                         <div class="card-body p-0">
+                            <?php if (!empty($users)): ?>
                             <div class="table-responsive">
-                                <table class="table table-hover mb-0">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th class="border-0">
-                                                <div class="d-flex align-items-center">
-                                                    <i class="material-icons me-2 text-muted" style="font-size: 1.2rem;">person</i>
-                                                    Username
-                                                </div>
-                                            </th>
-                                            <th class="border-0">
-                                                <div class="d-flex align-items-center">
-                                                    <i class="material-icons me-2 text-muted" style="font-size: 1.2rem;">email</i>
-                                                    Email
-                                                </div>
-                                            </th>
-                                            <th class="border-0">
-                                                <div class="d-flex align-items-center">
-                                                    <i class="material-icons me-2 text-muted" style="font-size: 1.2rem;">verified_user</i>
-                                                    Role
-                                                </div>
-                                            </th>
-                                            <th class="border-0">
-                                                <div class="d-flex align-items-center">
-                                                    <i class="material-icons me-2 text-muted" style="font-size: 1.2rem;">circle</i>
-                                                    Status
-                                                </div>
-                                            </th>
-                                            <th class="border-0">
-                                                <div class="d-flex align-items-center">
-                                                    <i class="material-icons me-2 text-muted" style="font-size: 1.2rem;">schedule</i>
-                                                    Last Login
-                                                </div>
-                                            </th>
-                                            <th class="border-0 text-end">Actions</th>
+                                <table class="table table-hover align-middle mb-0" style="font-size:0.83rem;">
+                                    <thead style="background:#f8fafc;">
+                                        <tr style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.6px;color:#94a3b8;">
+                                            <th class="px-4 py-3">User</th>
+                                            <th class="py-3">Email</th>
+                                            <th class="py-3">Role</th>
+                                            <th class="py-3">Status</th>
+                                            <th class="py-3">Routers</th>
+                                            <th class="py-3">Last Login</th>
+                                            <th class="py-3 text-end px-4">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-
                                         <?php foreach ($users as $u): ?>
-
-                                            <tr>
-                                                <td>
-                                                    <div class="d-flex align-items-center">
-                                                        <div class="avatar avatar-sm me-2">
-                                                            <div class="avatar-title bg-<?= $u['role'] == 'admin' ? 'primary' : 'secondary' ?>-soft text-<?= $u['role'] == 'admin' ? 'primary' : 'secondary' ?> rounded-circle">
-                                                                <?= strtoupper(substr($u['username'], 0, 1)) ?>
-                                                            </div>
-                                                        </div>
-                                                        <div>
-                                                            <div class="fw-500"><?= htmlspecialchars($u['username']) ?></div>
-                                                            <?php if ($u['user_id'] == $_SESSION['user']['id']): ?>
-                                                                <small class="text-muted">(You)</small>
-                                                            <?php endif; ?>
-                                                        </div>
+                                        <?php $uRouters = $assignMap[$u['user_id']] ?? []; ?>
+                                        <tr style="border-bottom:1px solid #f1f5f9;">
+                                            <td class="px-4 py-3">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <div style="width:34px;height:34px;border-radius:50%;background:<?= $u['role']==='admin' ? '#eff6ff' : '#f8fafc' ?>;border:1px solid <?= $u['role']==='admin' ? '#bfdbfe' : '#e2e8f0' ?>;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem;color:<?= $u['role']==='admin' ? '#3b82f6' : '#64748b' ?>;flex-shrink:0;">
+                                                        <?= strtoupper(substr($u['username'], 0, 1)) ?>
                                                     </div>
-                                                </td>
-                                                <td>
-                                                    <div class="text-muted">
-                                                        <?= htmlspecialchars($u['email'] ?? '-') ?>
+                                                    <div>
+                                                        <div style="font-weight:600;color:#1e293b;"><?= htmlspecialchars($u['username']) ?></div>
+                                                        <?php if ($u['user_id'] == $me): ?>
+                                                        <div style="font-size:0.7rem;color:#94a3b8;">You</div>
+                                                        <?php endif; ?>
                                                     </div>
-                                                </td>
-
-                                                <td>
-                                                    <span class="badge rounded-pill bg-<?= $u['role'] == 'admin' ? 'primary' : 'secondary' ?>-soft text-<?= $u['role'] == 'admin' ? 'primary' : 'secondary' ?>">
-                                                        <i class="material-icons me-1" style="font-size: 0.875rem; vertical-align: middle;">
-                                                            <?= $u['role'] == 'admin' ? 'admin_panel_settings' : 'person' ?>
-                                                        </i>
-                                                        <?= ucfirst($u['role']) ?>
+                                                </div>
+                                            </td>
+                                            <td style="color:#64748b;"><?= htmlspecialchars($u['email'] ?: '—') ?></td>
+                                            <td>
+                                                <span style="background:<?= $u['role']==='admin'?'#eff6ff':'#f8fafc' ?>;color:<?= $u['role']==='admin'?'#1d4ed8':'#475569' ?>;font-size:0.72rem;font-weight:700;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:0.5px;">
+                                                    <?= ucfirst($u['role']) ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span style="background:<?= $u['status']==='active'?'#f0fdf4':'#fef2f2' ?>;color:<?= $u['status']==='active'?'#15803d':'#dc2626' ?>;font-size:0.72rem;font-weight:700;padding:3px 9px;border-radius:20px;display:inline-flex;align-items:center;gap:4px;">
+                                                    <span style="width:6px;height:6px;border-radius:50%;background:<?= $u['status']==='active'?'#22c55e':'#ef4444' ?>;"></span>
+                                                    <?= ucfirst($u['status']) ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <?php if (!empty($uRouters)): ?>
+                                                    <span style="background:#f0f9ff;color:#0369a1;font-size:0.72rem;font-weight:600;padding:3px 9px;border-radius:20px;">
+                                                        <i class="fa fa-server me-1" style="font-size:0.65rem;"></i><?= count($uRouters) ?> router<?= count($uRouters)!=1?'s':'' ?>
                                                     </span>
-                                                </td>
-
-                                                <td>
-                                                    <span class="badge rounded-pill bg-<?= $u['status'] == 'active' ? 'success' : 'danger' ?>-soft text-<?= $u['status'] == 'active' ? 'success' : 'danger' ?>">
-                                                        <i class="material-icons me-1" style="font-size: 0.875rem; vertical-align: middle;">
-                                                            <?= $u['status'] == 'active' ? 'check_circle' : 'cancel' ?>
-                                                        </i>
-                                                        <?= ucfirst($u['status']) ?>
-                                                    </span>
-                                                </td>
-
-                                                <td>
-                                                    <div class="small">
-                                                        <?= $u['last_login'] ? date('d M Y H:i', strtotime($u['last_login'])) : '<span class="text-muted">Never</span>' ?>
-                                                    </div>
-                                                </td>
-
-                                                <td class="text-end">
-
-                                                    <?php if ($u['user_id'] != $_SESSION['user']['id']): ?>
-
-                                                        <div class="dropdown">
-                                                            <button class="btn btn-sm btn-text dropdown-toggle" data-bs-toggle="dropdown">
-                                                                <i class="material-icons">more_vert</i>
-                                                            </button>
-                                                            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-
-                                                                <li>
-                                                                    <a href="#" class="dropdown-item edit-user"
-                                                                        data-id="<?= $u['user_id'] ?>"
-                                                                        data-username="<?= $u['username'] ?>"
-                                                                        data-email="<?= $u['email'] ?>"
-                                                                        data-role="<?= $u['role'] ?>"
-                                                                        data-status="<?= $u['status'] ?>">
-                                                                        <i class="material-icons me-2">edit</i>
-                                                                        Edit User
-                                                                    </a>
-                                                                </li>
-
-                                                                <li>
-                                                                    <a href="resetPassword.php?id=<?= $u['user_id'] ?>"
-                                                                        class="dropdown-item"
-                                                                        onclick="return confirm('Reset password for this user?')">
-                                                                        <i class="material-icons me-2 text-warning">lock_reset</i>
-                                                                        Reset Password
-                                                                    </a>
-                                                                </li>
-
-                                                                <li>
-                                                                    <hr class="dropdown-divider">
-                                                                </li>
-
-                                                                <li>
-                                                                    <a href="toggle.php?id=<?= $u['user_id'] ?>"
-                                                                        class="dropdown-item"
-                                                                        onclick="return confirm('Change user status?')">
-                                                                        <i class="material-icons me-2 text-<?= $u['status'] == 'active' ? 'danger' : 'success' ?>">
-                                                                            <?= $u['status'] == 'active' ? 'block' : 'check_circle' ?>
-                                                                        </i>
-                                                                        <?= $u['status'] == 'active' ? 'Disable User' : 'Enable User' ?>
-                                                                    </a>
-                                                                </li>
-
-                                                            </ul>
-                                                        </div>
-
-                                                    <?php else: ?>
-                                                        <span class="badge bg-light text-dark border">
-                                                            <i class="material-icons" style="font-size: 0.875rem; vertical-align: middle;">person</i>
-                                                            Current User
-                                                        </span>
-                                                    <?php endif; ?>
-
-                                                </td>
-
-                                            </tr>
+                                                <?php else: ?>
+                                                    <span style="color:#94a3b8;font-size:0.75rem;">None assigned</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td style="color:#64748b;font-size:0.78rem;">
+                                                <?= $u['last_login'] ? date('d M Y H:i', strtotime($u['last_login'])) : '<span style="color:#94a3b8;">Never</span>' ?>
+                                            </td>
+                                            <td class="text-end px-4">
+                                                <?php if ($u['user_id'] != $me): ?>
+                                                <div class="dropdown">
+                                                    <button class="btn btn-sm dropdown-toggle"
+                                                        style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;color:#64748b;font-size:0.78rem;padding:4px 10px;"
+                                                        data-bs-toggle="dropdown">
+                                                        <i class="fa fa-ellipsis-v"></i>
+                                                    </button>
+                                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border-radius:10px;border:1px solid #e2e8f0;font-size:0.82rem;min-width:170px;">
+                                                        <li>
+                                                            <a href="#" class="dropdown-item py-2 edit-user"
+                                                                data-id="<?= $u['user_id'] ?>"
+                                                                data-username="<?= htmlspecialchars($u['username']) ?>"
+                                                                data-email="<?= htmlspecialchars($u['email'] ?? '') ?>"
+                                                                data-role="<?= $u['role'] ?>"
+                                                                data-status="<?= $u['status'] ?>"
+                                                                data-routers='<?= json_encode($uRouters) ?>'>
+                                                                <i class="fa fa-edit me-2 text-primary"></i>Edit User
+                                                            </a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="#" class="dropdown-item py-2 assign-routers"
+                                                                data-id="<?= $u['user_id'] ?>"
+                                                                data-username="<?= htmlspecialchars($u['username']) ?>"
+                                                                data-routers='<?= json_encode($uRouters) ?>'>
+                                                                <i class="fa fa-server me-2 text-info"></i>Assign Routers
+                                                            </a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="#" class="dropdown-item py-2 reset-password"
+                                                                data-id="<?= $u['user_id'] ?>"
+                                                                data-username="<?= htmlspecialchars($u['username']) ?>">
+                                                                <i class="fa fa-lock-open me-2 text-warning"></i>Reset Password
+                                                            </a>
+                                                        </li>
+                                                        <li><hr class="dropdown-divider my-1"></li>
+                                                        <li>
+                                                            <a href="#" class="dropdown-item py-2 toggle-status"
+                                                                data-id="<?= $u['user_id'] ?>"
+                                                                data-username="<?= htmlspecialchars($u['username']) ?>"
+                                                                data-status="<?= $u['status'] ?>">
+                                                                <i class="fa fa-<?= $u['status']==='active'?'ban':'circle-check' ?> me-2 text-<?= $u['status']==='active'?'danger':'success' ?>"></i>
+                                                                <?= $u['status']==='active' ? 'Disable' : 'Enable' ?> User
+                                                            </a>
+                                                        </li>
+                                                        <li>
+                                                            <a href="#" class="dropdown-item py-2 delete-user"
+                                                                data-id="<?= $u['user_id'] ?>"
+                                                                data-username="<?= htmlspecialchars($u['username']) ?>">
+                                                                <i class="fa fa-trash me-2 text-danger"></i>Delete User
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
+                                                <?php else: ?>
+                                                <span style="background:#f1f5f9;color:#94a3b8;font-size:0.72rem;padding:4px 10px;border-radius:20px;border:1px solid #e2e8f0;">
+                                                    <i class="fa fa-user me-1"></i>You
+                                                </span>
+                                                <?php endif; ?>
+                                            </td>
+                                        </tr>
                                         <?php endforeach; ?>
-
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
-                        
-                        <div class="card-footer bg-white small text-muted py-3">
-                            Showing <?= count($users) ?> user<?= count($users) != 1 ? 's' : '' ?> • Last updated: <?= date('d M Y H:i') ?>
+                            <?php else: ?>
+                            <div class="text-center py-5">
+                                <div style="width:56px;height:56px;background:#f1f5f9;border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+                                    <i class="fa fa-users" style="color:#94a3b8;font-size:1.4rem;"></i>
+                                </div>
+                                <p style="color:#64748b;font-size:0.88rem;margin-bottom:12px;">No users share your router assignments yet.</p>
+                                <button class="btn btn-sm px-4" style="background:#3b82f6;color:#fff;border:none;border-radius:9px;font-weight:600;"
+                                    data-bs-toggle="modal" data-bs-target="#addUserModal">
+                                    <i class="fa fa-plus me-1"></i>Add First User
+                                </button>
+                            </div>
+                            <?php endif; ?>
                         </div>
                     </div>
 
                 </div>
             </main>
+
             <?php require_once "modals.php"; ?>
             <?php require_once "../partials/footer.php"; ?>
         </div>
     </div>
 
     <?php require_once "../partials/scripts.php"; ?>
-</body>
 
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+
+        function set(id, val) {
+            const el = document.getElementById(id);
+            if (el) el.value = val;
+        }
+
+        /* ── Edit User ── */
+        document.querySelectorAll('.edit-user').forEach(btn => {
+            btn.addEventListener('click', e => {
+                e.preventDefault();
+                set('edit-id',       btn.dataset.id);
+                set('edit-username', btn.dataset.username);
+                set('edit-email',    btn.dataset.email);
+                set('edit-role',     btn.dataset.role);
+                set('edit-status',   btn.dataset.status);
+                new bootstrap.Modal('#editUserModal').show();
+            });
+        });
+
+        /* ── Assign Routers ── */
+        document.querySelectorAll('.assign-routers').forEach(btn => {
+            btn.addEventListener('click', e => {
+                e.preventDefault();
+                set('assign-user-id', btn.dataset.id);
+                document.getElementById('assignRouterTitle').textContent = btn.dataset.username;
+                const assigned = JSON.parse(btn.dataset.routers || '[]');
+                document.querySelectorAll('.router-checkbox').forEach(cb => {
+                    cb.checked = assigned.includes(parseInt(cb.value));
+                });
+                new bootstrap.Modal('#assignRoutersModal').show();
+            });
+        });
+
+        /* ── Reset Password ── */
+        document.querySelectorAll('.reset-password').forEach(btn => {
+            btn.addEventListener('click', e => {
+                e.preventDefault();
+                set('reset-id', btn.dataset.id);
+                document.getElementById('resetUsername').textContent = btn.dataset.username;
+                new bootstrap.Modal('#resetPasswordModal').show();
+            });
+        });
+
+        /* ── Toggle Status ── */
+        document.querySelectorAll('.toggle-status').forEach(btn => {
+            btn.addEventListener('click', e => {
+                e.preventDefault();
+                set('toggle-id',     btn.dataset.id);
+                set('toggle-status', btn.dataset.status);
+                const action = btn.dataset.status === 'active' ? 'disable' : 'enable';
+                document.getElementById('toggleUsername').textContent = btn.dataset.username;
+                document.getElementById('toggleAction').textContent   = action;
+                document.getElementById('toggleActionBtn').textContent = ucfirst(action) + ' User';
+                document.getElementById('toggleActionBtn').className =
+                    'btn ' + (action === 'disable' ? 'btn-danger' : 'btn-success');
+                new bootstrap.Modal('#toggleStatusModal').show();
+            });
+        });
+
+        /* ── Delete User ── */
+        document.querySelectorAll('.delete-user').forEach(btn => {
+            btn.addEventListener('click', e => {
+                e.preventDefault();
+                set('delete-id', btn.dataset.id);
+                document.getElementById('deleteUsername').textContent = btn.dataset.username;
+                new bootstrap.Modal('#deleteUserModal').show();
+            });
+        });
+
+        function ucfirst(str) {
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        }
+    });
+    </script>
+
+</body>
 </html>

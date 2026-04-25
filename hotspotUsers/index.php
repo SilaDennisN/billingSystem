@@ -3,34 +3,45 @@ require_once "../partials/head.php";
 require_once "../core/db.php";
 require_once "../core/auth.php";
 require_once "../core/router.php";
+require __DIR__ . '/../subscription/subscription_gate.php';
 
 if (!is_logged_in()) {
-    header("Location: /auth/login");
+    header("Location: ../auth/login");
     exit;
 }
+check_subscription_gate($pdo, $user_id);
+
 
 /* Load users (hotspot + pppoe) */
-$users = $pdo->query("
+$stmt = $pdo->prepare("
     SELECT hu.*, r.name AS router_name, hp.profile_name AS plan_name
     FROM hotspot_users hu
     JOIN routers r ON r.router_id = hu.router_id
+    JOIN user_router_access ur ON ur.router_id = hu.router_id
     LEFT JOIN hotspot_profiles hp ON hp.id = hu.plan_id
+    WHERE ur.user_id = ?
     ORDER BY hu.user_type, hu.username
-")->fetchAll();
+");
 
-/* Load captive portal sessions */
-$sessions = $pdo->query("
-    SELECT hs.*, r.name AS router_name, hp.profile_name AS plan_name
-    FROM hotspot_sessions hs
-    JOIN routers r ON r.router_id = hs.router_id
-    LEFT JOIN hotspot_profiles hp ON hp.id = hs.plan_id
-")->fetchAll();
+$stmt->execute([$user_id]);
+$users = $stmt->fetchAll();
 
 /* Load live users */
 $liveHotspot = [];
 $livePPPoE   = [];
 
-$routers = $pdo->query("SELECT * FROM routers WHERE status='active'")->fetchAll();
+$user_id = $_SESSION['user']['id'];
+
+$stmt = $pdo->prepare("
+    SELECT r.*
+    FROM routers r
+    JOIN user_router_access ur ON ur.router_id = r.router_id
+    WHERE ur.user_id = ?
+    AND r.status = 'active'
+");
+
+$stmt->execute([$user_id]);
+$routers = $stmt->fetchAll();
 
 
 
@@ -53,7 +64,16 @@ foreach ($routers as $router) {
 }
 
 /* Load plans for modal */
-$plans = $pdo->query("SELECT * FROM hotspot_profiles WHERE plan_type ='pppoe'")->fetchAll();
+$stmt = $pdo->prepare("
+    SELECT hp.*
+    FROM hotspot_profiles hp
+    JOIN user_router_access ur ON ur.router_id = hp.router_id
+    WHERE ur.user_id = ?
+    AND hp.plan_type = 'pppoe'
+");
+
+$stmt->execute([$user_id]);
+$plans = $stmt->fetchAll();
 $router_id = $routers[0]['router_id'] ?? null;
 
 /* Calculate stats */
@@ -62,13 +82,12 @@ $onlineUsers = 0;
 $activeUsers = 0;
 $pppoeCount = 0;
 $hotspotCount = 0;
-$captiveCount = count($sessions);
 
 foreach ($users as $u) {
     if ($u['status'] === 'active') $activeUsers++;
     if ($u['user_type'] === 'pppoe') $pppoeCount++;
     else $hotspotCount++;
-    
+
     $online = $u['user_type'] === 'pppoe'
         ? isset($livePPPoE[$u['username']])
         : isset($liveHotspot[$u['username']]);
@@ -99,9 +118,11 @@ foreach ($users as $u) {
                                 <span class="badge bg-secondary-soft text-secondary">
                                     <i class="fa fa-circle me-1"></i><?= $totalUsers - $onlineUsers ?> Offline
                                 </span>
-                                <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#addUserModal">
-                                    <i class="fa fa-plus me-1"></i>Add User
-                                </button>
+                                <?php if ($_SESSION['user']['role'] !== "staff"): ?>
+                                    <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                                        <i class="fa fa-plus me-1"></i>Add User
+                                    </button>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -212,7 +233,9 @@ foreach ($users as $u) {
                                             <th><i class="fa fa-signal me-1"></i>Online</th>
                                             <th><i class="fa fa-check-circle me-1"></i>Status</th>
                                             <th><i class="fa fa-clock me-1"></i>Expires</th>
-                                            <th class="text-end"><i class="fa fa-cog me-1"></i>Actions</th>
+                                            <?php if ($_SESSION['user']['role'] !== "staff"): ?>
+                                                <th class="text-end"><i class="fa fa-cog me-1"></i>Actions</th>
+                                            <?php endif; ?>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -222,7 +245,7 @@ foreach ($users as $u) {
                                             $online = $u['user_type'] === 'pppoe'
                                                 ? isset($livePPPoE[$u['username']])
                                                 : isset($liveHotspot[$u['username']]);
-                                            
+
                                             $isExpired = strtotime($u['expires_at']) < time();
                                         ?>
                                             <tr data-type="<?= $u['user_type'] ?>">
@@ -284,106 +307,65 @@ foreach ($users as $u) {
                                                         <?= date("M d, Y H:i", strtotime($u['expires_at'])) ?>
                                                     </small>
                                                 </td>
-                                                <td class="text-end">
-                                                    <div class="btn-group btn-group-sm">
-                                                        <button class="btn btn-outline-primary" title="View Details">
-                                                            <i class="fa fa-eye"></i>
-                                                        </button>
-                                                        <button class="btn btn-outline-secondary" title="Edit">
-                                                            <i class="fa fa-edit"></i>
-                                                        </button>
-                                                        <?php if ($online): ?>
-                                                            <button class="btn btn-outline-warning" title="Disconnect">
-                                                                <i class="fa fa-plug"></i>
-                                                            </button>
-                                                        <?php endif; ?>
-                                                        <button class="btn btn-outline-danger" title="Delete">
-                                                            <i class="fa fa-trash"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
+                                                <?php if ($_SESSION['user']['role'] !== "staff"): ?>
+                                                    <td class="text-end">
+                                                        <div class="btn-group btn-group-sm">
+                                                            <button class="btn btn-outline-primary viewBtn"
+                                                                data-bs-toggle="modal"
+                                                                data-bs-target="#viewUserModal"
 
-                                        <!-- CAPTIVE PORTAL (TEMP USERS) -->
-                                        <?php foreach ($sessions as $s): 
-                                            $isExpired = $s['expires_at'] && strtotime($s['expires_at']) < time();
-                                        ?>
-                                            <tr data-type="captive">
-                                                <td>
-                                                    <div class="d-flex align-items-center">
-                                                        <div class="avatar avatar-sm me-2">
-                                                            <div class="avatar-title bg-warning-soft text-warning rounded-circle">
-                                                                <i class="fa fa-wifi"></i>
-                                                            </div>
-                                                        </div>
-                                                        <div>
-                                                            <code><?= $s['mac_address'] ?></code>
-                                                            <?php if ($s['paid']): ?>
-                                                                <i class="fa fa-circle text-success ms-1" style="font-size: 0.5rem;" title="Online"></i>
+                                                                data-username="<?= $u['username'] ?>"
+                                                                data-router="<?= $u['router_name'] ?>"
+                                                                data-plan="<?= $u['plan_name'] ?>"
+                                                                data-status="<?= $u['status'] ?>"
+                                                                data-expiry="<?= $u['expires_at'] ?>">
+
+                                                                <i class="fa fa-eye"></i>
+
+                                                            </button>
+
+                                                            <?php if ($u['user_type'] === 'pppoe'): ?>
+
+                                                                <?php if ($u['user_type'] === 'pppoe'): ?>
+
+                                                                    <button class="btn btn-outline-secondary editBtn"
+                                                                        data-bs-toggle="modal"
+                                                                        data-bs-target="#editUserModal"
+                                                                        data-username="<?= $u['username'] ?>"
+                                                                        data-plan="<?= $u['plan_id'] ?>"
+                                                                        data-expiry="<?= $u['expires_at'] ?>">
+                                                                        <i class="fa fa-edit"></i>
+                                                                    </button>
+
+                                                                <?php else: ?>
+
+                                                                    <button class="btn btn-outline-secondary" disabled title="Hotspot users cannot be edited">
+                                                                        <i class="fa fa-lock"></i>
+                                                                    </button>
+
+                                                                <?php endif; ?>
+
+
                                                             <?php endif; ?>
+
+
+
+
+                                                            <button class="btn btn-outline-danger deleteBtn"
+
+                                                                data-bs-toggle="modal"
+
+                                                                data-bs-target="#deleteUserModal"
+
+                                                                data-username="<?= $u['username'] ?>">
+
+                                                                <i class="fa fa-trash"></i>
+
+                                                            </button>
+
                                                         </div>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <span class="badge bg-warning-soft text-warning">
-                                                        <i class="fa fa-wifi me-1"></i>CAPTIVE
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <span class="badge bg-primary-soft text-primary">
-                                                        <?= $s['router_name'] ?>
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <?= $s['plan_name'] ?? '<span class="text-muted fst-italic">Not selected</span>' ?>
-                                                </td>
-                                                <td>
-                                                    <?php if ($s['paid']): ?>
-                                                        <span class="badge bg-success">
-                                                            <i class="fa fa-check-circle me-1"></i>Online
-                                                        </span>
-                                                    <?php else: ?>
-                                                        <span class="badge bg-secondary">
-                                                            <i class="fa fa-times-circle me-1"></i>Offline
-                                                        </span>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td>
-                                                    <?php if ($s['paid'] && !$isExpired): ?>
-                                                        <span class="badge bg-success-soft text-success">
-                                                            <i class="fa fa-check-circle me-1"></i>Paid
-                                                        </span>
-                                                    <?php elseif ($isExpired): ?>
-                                                        <span class="badge bg-warning-soft text-warning">
-                                                            <i class="fa fa-clock me-1"></i>Expired
-                                                        </span>
-                                                    <?php else: ?>
-                                                        <span class="badge bg-info-soft text-info">
-                                                            <i class="fa fa-hourglass-half me-1"></i>Pending
-                                                        </span>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td>
-                                                    <?php if ($s['expires_at']): ?>
-                                                        <small class="<?= $isExpired ? 'text-danger' : 'text-muted' ?>">
-                                                            <i class="fa fa-calendar me-1"></i>
-                                                            <?= date("M d, Y H:i", strtotime($s['expires_at'])) ?>
-                                                        </small>
-                                                    <?php else: ?>
-                                                        <small class="text-muted">-</small>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td class="text-end">
-                                                    <div class="btn-group btn-group-sm">
-                                                        <button class="btn btn-outline-primary" title="View Details">
-                                                            <i class="fa fa-eye"></i>
-                                                        </button>
-                                                        <button class="btn btn-outline-danger" title="Remove">
-                                                            <i class="fa fa-trash"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
+                                                    </td>
+                                                <?php endif; ?>
                                             </tr>
                                         <?php endforeach; ?>
 
@@ -400,7 +382,7 @@ foreach ($users as $u) {
     </div>
 
     <?php require_once "../partials/scripts.php"; ?>
-    
+
     <!-- Filter functionality -->
     <script>
         document.addEventListener("DOMContentLoaded", () => {
@@ -427,87 +409,75 @@ foreach ($users as $u) {
             });
         });
     </script>
+
+    <script>
+        document.addEventListener("click", function(e) {
+
+
+            /* VIEW */
+
+
+            if (e.target.closest(".viewBtn")) {
+
+
+                let btn = e.target.closest(".viewBtn");
+
+
+                view_username.innerText = btn.dataset.username;
+
+                view_router.innerText = btn.dataset.router;
+
+                view_plan.innerText = btn.dataset.plan;
+
+                view_status.innerText = btn.dataset.status;
+
+                view_expiry.innerText = btn.dataset.expiry;
+
+
+            }
+
+
+            /* EDIT */
+
+
+            if (e.target.closest(".editBtn")) {
+
+
+                let btn = e.target.closest(".editBtn");
+
+
+                edit_username.value = btn.dataset.username;
+
+                edit_plan.value = btn.dataset.plan;
+
+                edit_expiry.value = btn.dataset.expiry.replace(" ", "T");
+
+
+            }
+
+
+            /* DELETE */
+
+
+            if (e.target.closest(".deleteBtn")) {
+
+
+                let btn = e.target.closest(".deleteBtn");
+
+
+                delete_username.value = btn.dataset.username;
+
+                delete_username_text.innerText = btn.dataset.username;
+
+
+            }
+
+
+        });
+    </script>
+
 </body>
 
 </html>
 
-<!-- Enhanced Add User Modal -->
-<div class="modal fade" id="addUserModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-            <form method="POST" action="store.php">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">
-                        <i class="fa fa-user-plus me-2"></i>Add PPPoE User
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-
-                <div class="modal-body">
-                    <div class="row g-3">
-                        <input type="hidden" name="router_id" value="<?= $router_id ?>">
-                        <input type="hidden" name="user_type" value="pppoe">
-
-                        <div class="col-md-12">
-                            <label class="form-label">
-                                <i class="fa fa-server me-1"></i>Router
-                            </label>
-                            <select name="router_id" class="form-select" required>
-                                <option value="">Select Router</option>
-                                <?php foreach ($routers as $r): ?>
-                                    <option value="<?= $r['router_id'] ?>" <?= $r['router_id'] == $router_id ? 'selected' : '' ?>>
-                                        <?= $r['name'] ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-
-                        <div class="col-md-12">
-                            <label class="form-label">
-                                <i class="fa fa-box me-1"></i>Plan / Profile
-                            </label>
-                            <select name="plan_id" class="form-select" required>
-                                <option value="">Select Plan</option>
-                                <?php foreach ($plans as $p): ?>
-                                    <option value="<?= $p['id'] ?>">
-                                        <?= $p['profile_name'] ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label">
-                                <i class="fa fa-user me-1"></i>Username
-                            </label>
-                            <input type="text" name="username" class="form-control" placeholder="Enter username" required>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label">
-                                <i class="fa fa-key me-1"></i>Password
-                            </label>
-                            <input type="password" name="password" class="form-control" placeholder="Enter password" required>
-                        </div>
-
-                        <div class="col-12">
-                            <div class="alert alert-info mb-0">
-                                <i class="fa fa-info-circle me-2"></i>
-                                <strong>Note:</strong> The user will be created on the selected router with the chosen plan configuration.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">
-                        <i class="fa fa-times me-1"></i>Cancel
-                    </button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fa fa-check me-1"></i>Create PPPoE User
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
+<?php require_once "modals.php"; ?>

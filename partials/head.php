@@ -2,17 +2,21 @@
 date_default_timezone_set('Africa/Nairobi');
 $current = $_SERVER['REQUEST_URI'];
 
-function isActive($path)
+function pathMatch($path)
 {
     global $current;
-    return strpos($current, $path) !== false ? 'active' : '';
+    return preg_match('#' . preg_quote($path, '#') . '(/|$)#', $current);
+}
+
+function isActive($path)
+{
+    return pathMatch($path) ? 'active' : '';
 }
 
 function isShow($paths = [])
 {
-    global $current;
     foreach ($paths as $path) {
-        if (strpos($current, $path) !== false) {
+        if (pathMatch($path)) {
             return 'show';
         }
     }
@@ -21,9 +25,8 @@ function isShow($paths = [])
 
 function isCollapsed($paths = [])
 {
-    global $current;
     foreach ($paths as $path) {
-        if (strpos($current, $path) !== false) {
+        if (pathMatch($path)) {
             return '';
         }
     }

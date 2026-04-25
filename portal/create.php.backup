@@ -1,0 +1,203 @@
+<?php
+date_default_timezone_set('Africa/Nairobi');
+session_start();
+require_once "../core/db.php";
+
+$token = $_SESSION['payment_token'] ?? null;
+if (!$token) { http_response_code(403); exit("Session expired"); }
+
+$stmt = $pdo->prepare("SELECT * FROM payments WHERE payment_token=? AND status='used'");
+$stmt->execute([$token]);
+$payment = $stmt->fetch();
+
+if (!$payment) { http_response_code(403); exit("Payment not activated yet"); }
+
+$username        = $payment['username'];
+$password        = '123456';
+$link_login_only = $_SESSION['link-login-only'] ?? null;
+
+if (!$link_login_only) exit("Login link missing");
+
+// Use the original captive portal URL so the OS marks WiFi as "internet OK"
+// $dst = $_SESSION['link-orig'] ?? 'http://connectivitycheck.gstatic.com/generate_204';
+// $dst = $_SESSION['link-orig'];
+
+$sep = (strpos($link_login_only, '?') !== false) ? '&' : '?';
+$url = $link_login_only . $sep
+     . 'username=' . urlencode($username)
+     . '&password=' . urlencode($password)
+     . '&dst='      . urlencode($dst);
+
+header("Location: $url");
+exit;
+
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connecting…</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #f7f3ec;
+  --surface:   #fdfaf5;
+  --border-md: rgba(120,90,50,0.2);
+  --accent:    #2a7d4f;
+  --accent-lt: rgba(42,125,79,0.1);
+  --text:      #1e1a14;
+  --muted:     #8c7b65;
+  --warm2:     #d4c9b8;
+  --shadow-lg: 0 12px 40px rgba(100,70,30,0.13);
+}
+
+body {
+  font-family: 'Outfit', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px 16px;
+}
+
+/* Paper texture */
+body::after {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+}
+
+/* Decorative blob */
+body::before {
+  content: ''; position: fixed; top: -60px; right: -80px;
+  width: 300px; height: 300px;
+  background: radial-gradient(ellipse, rgba(42,125,79,0.07) 0%, transparent 70%);
+  pointer-events: none; z-index: 0; border-radius: 50%;
+}
+
+.card {
+  position: relative; z-index: 1;
+  background: var(--surface);
+  border: 1px solid var(--border-md);
+  border-radius: 24px;
+  padding: 44px 32px 40px;
+  width: 100%; max-width: 360px;
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+  animation: slideUp 0.5s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+}
+
+/* Animated Wi-Fi ring */
+.wifi-ring {
+  width: 76px; height: 76px; border-radius: 50%;
+  background: var(--accent-lt);
+  border: 2px solid rgba(42,125,79,0.2);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 24px;
+  position: relative;
+}
+.wifi-ring::before, .wifi-ring::after {
+  content: ''; position: absolute; border-radius: 50%;
+  border: 2px solid rgba(42,125,79,0.12);
+  animation: ripple 2s ease-out infinite;
+}
+.wifi-ring::before { inset: -12px; animation-delay: 0s; }
+.wifi-ring::after  { inset: -24px; animation-delay: 0.6s; }
+.wifi-ring svg { width: 32px; height: 32px; fill: var(--accent); position: relative; z-index: 1; }
+
+.card-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 22px; font-weight: 700;
+  color: var(--text); margin-bottom: 8px;
+}
+.card-sub {
+  font-size: 14px; color: var(--muted);
+  line-height: 1.6; margin-bottom: 28px;
+}
+
+/* Progress bar */
+.progress-track {
+  background: var(--warm2); border-radius: 4px;
+  height: 4px; overflow: hidden; margin-bottom: 28px;
+}
+.progress-fill {
+  height: 100%; border-radius: 4px;
+  background: linear-gradient(90deg, var(--accent), #1f6040);
+  animation: progressAnim 2.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Step list */
+.connect-steps {
+  background: #f0ebe1;
+  border: 1px solid var(--border-md);
+  border-radius: 14px; padding: 6px 16px;
+  text-align: left;
+}
+.cstep {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: var(--muted); font-weight: 500;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(120,90,50,0.08);
+  opacity: 0; animation: fadeIn 0.4s ease forwards;
+}
+.cstep:last-child { border-bottom: none; }
+.cstep:nth-child(1) { animation-delay: 0.3s; }
+.cstep:nth-child(2) { animation-delay: 1.0s; }
+.cstep:nth-child(3) { animation-delay: 1.7s; }
+
+.cstep-dot {
+  width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(42,125,79,0.1);
+  border: 1px solid rgba(42,125,79,0.25);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; color: var(--accent);
+}
+
+@keyframes ripple      { 0%{opacity:.6;transform:scale(1);}100%{opacity:0;transform:scale(1.25);} }
+@keyframes slideUp     { from{opacity:0;transform:translateY(24px);}to{opacity:1;transform:none;} }
+@keyframes fadeIn      { to{opacity:1;} }
+@keyframes progressAnim{ 0%{width:0%;}60%{width:80%;}90%{width:95%;}100%{width:100%;} }
+</style>
+</head>
+
+<body onload="document.login.submit()">
+
+<form name="login" method="post" action="<?= htmlspecialchars($link_login_only) ?>">
+    <input type="hidden" name="username" value="<?= htmlspecialchars($username) ?>">
+    <input type="hidden" name="password" value="<?= htmlspecialchars($password) ?>">
+    <input type="hidden" name="dst" value="https://www.google.com">
+</form>
+
+<div class="card">
+  <div class="wifi-ring">
+    <svg viewBox="0 0 24 24"><path d="M1.4 8.56C5.01 4.95 9.95 3 12 3s6.99 1.95 10.6 5.56l-2.1 2.1C17.6 7.7 14.95 6 12 6S6.4 7.7 3.5 10.66l-2.1-2.1zM12 11c-1.65 0-3.15.67-4.24 1.76L12 17l4.24-5.24A5.97 5.97 0 0012 11zM7.05 9.05C8.61 7.49 10.7 6.5 13 6.5c2.3 0 4.39.99 5.95 2.55l-2.12 2.12A4.97 4.97 0 0012 9.5c-1.4 0-2.67.58-3.58 1.5L7.05 9.05z"/></svg>
+  </div>
+
+  <div class="card-title">Connecting to internet…</div>
+  <div class="card-sub">Payment confirmed — establishing your session now.</div>
+
+  <div class="progress-track">
+    <div class="progress-fill"></div>
+  </div>
+
+  <div class="connect-steps">
+    <div class="cstep">
+      <div class="cstep-dot">✓</div>
+      Payment verified
+    </div>
+    <div class="cstep">
+      <div class="cstep-dot">✓</div>
+      Session credentials ready
+    </div>
+    <div class="cstep">
+      <div class="cstep-dot">✓</div>
+      Signing into hotspot…
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

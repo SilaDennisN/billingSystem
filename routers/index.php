@@ -1,13 +1,24 @@
 <?php
 require_once "../core/db.php";
 require_once "../core/auth.php";
+require __DIR__ . '/../subscription/subscription_gate.php';
 
 if (!is_logged_in()) {
     header("Location: ../auth/login");
     exit;
 }
+check_subscription_gate($pdo, $user_id);
 
-$routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
+$stmt = $pdo->prepare("
+    SELECT r.*
+    FROM routers r
+    INNER JOIN user_router_access ura
+        ON ura.router_id = r.router_id
+    WHERE ura.user_id = ?
+    ORDER BY r.name
+");
+$stmt->execute([$user_id]);
+$routers = $stmt->fetchAll();
 ?>
 
 <?php require_once "../partials/head.php" ?>
@@ -22,7 +33,6 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
         <div id="layoutDrawer_content">
             <main>
 
-                <!-- Enhanced Header -->
                 <header class="bg-primary">
                     <div class="container-xl px-1">
                         <div class="d-flex justify-content-between align-items-center py-3">
@@ -32,13 +42,18 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
                             <div class="d-flex align-items-center gap-3">
                                 <span class="badge bg-success-soft text-success" id="onlineRouters">
                                     <i class="fa fa-circle me-1"></i>0 Online
-                                </span>
+                                <!-- </span>
                                 <span class="badge bg-danger-soft text-danger" id="offlineRouters">
                                     <i class="fa fa-circle me-1"></i>0 Offline
+                                </span> -->
+                                <span id="wsStatusBadge" class="badge bg-warning-soft text-warning">
+                                    <i class="fa fa-circle me-1"></i>Connecting...
                                 </span>
-                                <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#addRouterModal">
-                                    <i class="fas fa-plus me-1"></i>Add Router
-                                </button>
+                                <?php if ($_SESSION['user']['role'] !== "staff"): ?>
+                                    <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#addRouterModal">
+                                        <i class="fa fa-plus me-1"></i>Add Router
+                                    </button>
+                                <?php endif ?>
                             </div>
                         </div>
                     </div>
@@ -46,26 +61,23 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
 
                 <div class="container-xl px-1 mt-4">
 
-                    <!-- Alerts -->
                     <?php if (!empty($_SESSION['success'])): ?>
-                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <div class="alert alert-success alert-dismissible fade show">
                             <i class="fas fa-check-circle me-2"></i>
-                            <?= $_SESSION['success'];
-                            unset($_SESSION['success']); ?>
+                            <?= $_SESSION['success']; unset($_SESSION['success']); ?>
                             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
                     <?php endif; ?>
 
                     <?php if (!empty($_SESSION['error'])): ?>
-                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <div class="alert alert-danger alert-dismissible fade show">
                             <i class="fas fa-exclamation-circle me-2"></i>
-                            <?= $_SESSION['error'];
-                            unset($_SESSION['error']); ?>
+                            <?= $_SESSION['error']; unset($_SESSION['error']); ?>
                             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
                     <?php endif; ?>
 
-                    <!-- Stats Cards Row -->
+                    <!-- Stats Cards -->
                     <div class="row mb-4">
                         <div class="col-xl-3 col-md-6 mb-4">
                             <div class="card card-raised border-start border-primary border-4">
@@ -75,14 +87,11 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
                                             <div class="small text-muted">Total Routers</div>
                                             <div class="h3 mb-0"><?= count($routers) ?></div>
                                         </div>
-                                        <div class="ms-3">
-                                            <i class="fa fa-server fa-2x text-primary opacity-50"></i>
-                                        </div>
+                                        <div class="ms-3"><i class="fa fa-server fa-2x text-primary opacity-50"></i></div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
                         <div class="col-xl-3 col-md-6 mb-4">
                             <div class="card card-raised border-start border-success border-4">
                                 <div class="card-body">
@@ -91,14 +100,11 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
                                             <div class="small text-muted">Online</div>
                                             <div class="h3 mb-0" id="statOnline">0</div>
                                         </div>
-                                        <div class="ms-3">
-                                            <i class="fa fa-check-circle fa-2x text-success opacity-50"></i>
-                                        </div>
+                                        <div class="ms-3"><i class="fa fa-check-circle fa-2x text-success opacity-50"></i></div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
                         <div class="col-xl-3 col-md-6 mb-4">
                             <div class="card card-raised border-start border-danger border-4">
                                 <div class="card-body">
@@ -107,58 +113,53 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
                                             <div class="small text-muted">Offline</div>
                                             <div class="h3 mb-0" id="statOffline">0</div>
                                         </div>
-                                        <div class="ms-3">
-                                            <i class="fa fa-times-circle fa-2x text-danger opacity-50"></i>
-                                        </div>
+                                        <div class="ms-3"><i class="fa fa-times-circle fa-2x text-danger opacity-50"></i></div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
                         <div class="col-xl-3 col-md-6 mb-4">
                             <div class="card card-raised border-start border-info border-4">
                                 <div class="card-body">
                                     <div class="d-flex align-items-center">
                                         <div class="flex-grow-1">
-                                            <div class="small text-muted">Avg Speed</div>
+                                            <div class="small text-muted">Total Throughput</div>
                                             <div class="h3 mb-0" id="statAvgSpeed">0 Mbps</div>
                                         </div>
-                                        <div class="ms-3">
-                                            <i class="fa fa-tachometer-alt fa-2x text-info opacity-50"></i>
-                                        </div>
+                                        <div class="ms-3"><i class="fa fa-tachometer-alt fa-2x text-info opacity-50"></i></div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Main Card -->
+                    <!-- Router Table -->
                     <div class="card card-raised shadow-sm">
                         <div class="card-header bg-primary text-white">
                             <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <i class="fas fa-list me-2"></i>Router List
-                                </div>
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked>
-                                    <label class="form-check-label text-white" for="autoRefreshToggle">
-                                        Auto-refresh (5s)
-                                    </label>
-                                </div>
+                                <div><i class="fas fa-list me-2"></i>Router List</div>
+                                <small class="text-white-50">
+                                    <i class="fa fa-circle-notch fa-spin me-1" id="liveSpinner"></i>
+                                    Live updates every 5s
+                                </small>
                             </div>
                         </div>
 
                         <div class="card-body p-0">
                             <div class="table-responsive">
-                                <table class="table table-hover align-middle mb-0">
+                                <table id="datatablesSimple" class="table table-hover align-middle mb-0">
                                     <thead class="table-light">
                                         <tr>
                                             <th><i class="fa fa-tag me-1"></i>Name</th>
                                             <th><i class="fa fa-network-wired me-1"></i>Host</th>
                                             <th><i class="fa fa-signal me-1"></i>Status</th>
-                                            <th><i class="fa fa-clock me-1"></i>Last Seen</th>
-                                            <th><i class="fa fa-tachometer-alt me-1"></i>Network Speed</th>
-                                            <th class="text-end"><i class="fas fa-cog me-1"></i>Actions</th>
+                                            <th><i class="fa fa-microchip me-1"></i>CPU</th>
+                                            <th><i class="fa fa-memory me-1"></i>RAM</th>
+                                            <th><i class="fa fa-clock me-1"></i>Uptime</th>
+                                            <th><i class="fa fa-tachometer-alt me-1"></i>Throughput</th>
+                                            <?php if ($_SESSION['user']['role'] !== "staff"): ?>
+                                                <th class="text-end"><i class="fas fa-cog me-1"></i>Actions</th>
+                                            <?php endif; ?>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -171,54 +172,88 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
                                                                 <i class="fa fa-server"></i>
                                                             </div>
                                                         </div>
-                                                        <strong><?= htmlspecialchars($router['name']) ?></strong>
+                                                        <div>
+                                                            <strong><?= htmlspecialchars($router['name']) ?></strong>
+                                                            <div class="small text-muted" id="hostname-<?= $router['router_id'] ?>"></div>
+                                                        </div>
                                                     </div>
                                                 </td>
                                                 <td><code class="text-muted"><?= htmlspecialchars($router['host']) ?></code></td>
                                                 <td>
-                                                    <span class="badge bg-secondary status-badge">
+                                                    <span class="badge bg-secondary status-badge" id="status-<?= $router['router_id'] ?>">
                                                         <i class="fa fa-spinner fa-spin me-1"></i>Checking...
                                                     </span>
                                                 </td>
-                                                <td class="last-seen">
-                                                    <small class="text-muted">
-                                                        <i class="fa fa-clock me-1"></i>
-                                                        <?= $router['last_seen'] ?? '—' ?>
-                                                    </small>
+                                                <td>
+                                                    <div class="d-flex align-items-center gap-2" style="min-width:80px;">
+                                                        <div class="progress flex-grow-1" style="height:6px;">
+                                                            <div class="progress-bar bg-primary" id="cpuBar-<?= $router['router_id'] ?>" style="width:0%;transition:width .4s;"></div>
+                                                        </div>
+                                                        <small id="cpuVal-<?= $router['router_id'] ?>" class="text-muted">—</small>
+                                                    </div>
                                                 </td>
-                                                <td class="router-speed">
+                                                <td>
+                                                    <div class="d-flex align-items-center gap-2" style="min-width:80px;">
+                                                        <div class="progress flex-grow-1" style="height:6px;">
+                                                            <div class="progress-bar bg-success" id="memBar-<?= $router['router_id'] ?>" style="width:0%;transition:width .4s;"></div>
+                                                        </div>
+                                                        <small id="memVal-<?= $router['router_id'] ?>" class="text-muted">—</small>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <small class="text-muted" id="uptime-<?= $router['router_id'] ?>">—</small>
+                                                </td>
+                                                <td>
                                                     <div class="d-flex align-items-center gap-2">
                                                         <canvas id="speedChart-<?= $router['router_id'] ?>" width="120" height="40"></canvas>
                                                         <div>
-                                                            <div class="badge bg-info-soft text-info" id="currentSpeed-<?= $router['router_id'] ?>">
-                                                                <i class="fa fa-sync-alt fa-spin"></i> Loading...
+                                                            <div class="badge bg-success-soft text-success small mb-1" id="speed-dl-<?= $router['router_id'] ?>">
+                                                                <i class="fa fa-arrow-down"></i> —
+                                                            </div>
+                                                            <div class="badge bg-info-soft text-info small" id="speed-ul-<?= $router['router_id'] ?>">
+                                                                <i class="fa fa-arrow-up"></i> —
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td class="text-end">
-                                                    <div class="btn-group btn-group-sm">
-                                                        <button class="btn btn-outline-primary view-router" data-id="<?= $router['router_id'] ?>" title="View Details">
-                                                            <i class="fa fa-eye"></i>
-                                                        </button>
-                                                        <button class="btn btn-outline-secondary edit-router" data-id="<?= $router['router_id'] ?>" title="Edit">
-                                                            <i class="fa fa-edit"></i>
-                                                        </button>
-                                                        <button class="btn btn-outline-danger delete-router" data-id="<?= $router['router_id'] ?>" title="Delete">
-                                                            <i class="fa fa-trash"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
+                                                <?php if ($_SESSION['user']['role'] !== "staff"): ?>
+                                                    <td class="text-end">
+                                                        <div class="btn-group btn-group-sm">
+                                                            <button class="btn btn-outline-primary view-router"
+                                                                data-bs-toggle="modal"
+                                                                data-bs-target="#viewRouterModal"
+                                                                data-id="<?= $router['router_id'] ?>"
+                                                                data-name="<?= htmlspecialchars($router['name']) ?>">
+                                                                <i class="fa fa-eye"></i>
+                                                            </button>
+                                                            <button class="btn btn-outline-secondary edit-router"
+                                                                data-bs-toggle="modal"
+                                                                data-bs-target="#editRouterModal"
+                                                                data-id="<?= $router['router_id'] ?>"
+                                                                data-name="<?= htmlspecialchars($router['name']) ?>"
+                                                                data-host="<?= htmlspecialchars($router['host']) ?>"
+                                                                data-port="<?= $router['api_port'] ?>">
+                                                                <i class="fa fa-edit"></i>
+                                                            </button>
+                                                            <button class="btn btn-outline-danger delete-router"
+                                                                data-bs-toggle="modal"
+                                                                data-bs-target="#deleteRouterModal"
+                                                                data-id="<?= $router['router_id'] ?>"
+                                                                data-name="<?= htmlspecialchars($router['name']) ?>">
+                                                                <i class="fa fa-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                <?php endif; ?>
                                             </tr>
                                         <?php endforeach ?>
                                     </tbody>
                                 </table>
                             </div>
 
-                            <!-- Empty State -->
                             <?php if (empty($routers)): ?>
                                 <div class="text-center py-5">
-                                    <i class="fas fa-server fa-3x text-muted mb-3"></i>
+                                    <i class="fa fa-server fa-3x text-muted mb-3"></i>
                                     <p class="text-muted">No routers configured yet</p>
                                     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRouterModal">
                                         <i class="fa fa-plus me-1"></i>Add Your First Router
@@ -238,235 +273,245 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
     <?php require_once "../partials/scripts.php" ?>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- Router Speed Chart Script -->
     <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const charts = {};
-            const autoRefreshToggle = document.getElementById("autoRefreshToggle");
-            let refreshInterval;
+    (function () {
+        const MAX_POINTS = 20;
+        const charts     = {};
+        const routerIds  = [];
 
-            function formatSpeed(bitsPerSecond) {
-                const units = ['bps', 'Kbps', 'Mbps', 'Gbps'];
-                let speed = bitsPerSecond;
-                let unitIndex = 0;
-
-                while (speed >= 1000 && unitIndex < units.length - 1) {
-                    speed /= 1000;
-                    unitIndex++;
-                }
-
-                const decimals = speed < 10 ? 2 : 1;
-                return `${speed.toFixed(decimals)} ${units[unitIndex]}`;
-            }
-
-            // Initialize charts
-            document.querySelectorAll("tr[data-router-id]").forEach(row => {
-                const routerId = row.dataset.routerId;
-                const canvas = document.getElementById(`speedChart-${routerId}`);
-                if (!canvas) return;
-                const ctx = canvas.getContext('2d');
-
-                charts[routerId] = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: [],
-                        datasets: [{
-                                label: 'Download',
-                                data: [],
-                                borderColor: '#00ba88',
-                                backgroundColor: 'rgba(0,186,136,0.15)',
-                                tension: 0.4,
-                                fill: true,
-                                pointRadius: 0
-                            },
-                            {
-                                label: 'Upload',
-                                data: [],
-                                borderColor: '#0061f2',
-                                backgroundColor: 'rgba(0,97,242,0.15)',
-                                tension: 0.4,
-                                fill: true,
-                                pointRadius: 0
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: false,
-                        animation: false,
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        },
-                        scales: {
-                            x: {
-                                display: false
-                            },
-                            y: {
-                                beginAtZero: true,
-                                display: false
-                            }
-                        }
-                    }
-                });
-
-            });
-
-            function updateStats() {
-                let onlineCount = 0;
-                let offlineCount = 0;
-                let totalSpeed = 0;
-                let speedCount = 0;
-
-                document.querySelectorAll("tr[data-router-id]").forEach(row => {
-                    const badge = row.querySelector(".status-badge");
-                    if (badge.textContent.includes("Online")) {
-                        onlineCount++;
-                    } else if (badge.textContent.includes("Offline")) {
-                        offlineCount++;
-                    }
-
-                    const routerId = row.dataset.routerId;
-                    const chart = charts[routerId];
-                    if (chart && chart.data.datasets[0].data.length > 0) {
-                        const lastSpeed = chart.data.datasets[0].data[chart.data.datasets[0].data.length - 1];
-                        totalSpeed += lastSpeed;
-                        speedCount++;
-                    }
-                });
-
-                document.getElementById("statOnline").textContent = onlineCount;
-                document.getElementById("statOffline").textContent = offlineCount;
-                document.getElementById("onlineRouters").innerHTML = `<i class="fa fa-circle me-1"></i>${onlineCount} Online`;
-                document.getElementById("offlineRouters").innerHTML = `<i class="fa fa-circle me-1"></i>${offlineCount} Offline`;
-
-                const avgSpeed = speedCount > 0 ? totalSpeed / speedCount : 0;
-                document.getElementById("statAvgSpeed").textContent = formatSpeed(avgSpeed * 1e6);
-            }
-
-            function updateSpeeds() {
-                document.querySelectorAll("tr[data-router-id]").forEach(row => {
-                    const routerId = row.dataset.routerId;
-                    const badge = row.querySelector(".status-badge");
-                    const lastSeen = row.querySelector(".last-seen");
-
-                    fetch(`./test_speed.php?id=${routerId}`)
-                        .then(res => res.json())
-                        .then(data => {
-                            // Update status badge
-                            if (!data.online) {
-                                badge.innerHTML = '<i class="fas fa-times-circle me-1"></i>Offline';
-                                badge.className = "badge status-badge bg-danger";
-                            } else if (data.idle) {
-                                badge.innerHTML = '<i class="fas fa-pause-circle me-1"></i>Idle';
-                                badge.className = "badge status-badge bg-warning text-dark";
-                            } else {
-                                badge.innerHTML = '<i class="fa fa-check-circle me-1"></i>Online';
-                                badge.className = "badge status-badge bg-success";
-                            }
-
-
-                            lastSeen.innerHTML = `<small class="text-muted"><i class="fas fa-clock me-1"></i>${data.last_seen ?? '—'}</small>`;
-
-                            const chart = charts[routerId];
-                            if (!chart) return;
-
-                            const now = new Date().toLocaleTimeString();
-                            const speedValue = parseFloat(data.speed) || 0;
-
-                            // Update chart
-                            const down = parseFloat(data.download) || 0;
-                            const up = parseFloat(data.upload) || 0;
-
-                            chart.data.labels.push(now);
-                            chart.data.datasets[0].data.push(down);
-                            chart.data.datasets[1].data.push(up);
-
-                            if (chart.data.labels.length > 20) {
-                                chart.data.labels.shift();
-                                chart.data.datasets.forEach(ds => ds.data.shift());
-                            }
-
-
-
-
-                            // Dynamic color based on speed
-                            if (speedValue >= 50) {
-                                chart.data.datasets[0].borderColor = '#00ba88';
-                                chart.data.datasets[0].backgroundColor = 'rgba(0, 186, 136, 0.1)';
-                            } else if (speedValue >= 20) {
-                                chart.data.datasets[0].borderColor = '#f4a100';
-                                chart.data.datasets[0].backgroundColor = 'rgba(244, 161, 0, 0.1)';
-                            } else {
-                                chart.data.datasets[0].borderColor = '#e81500';
-                                chart.data.datasets[0].backgroundColor = 'rgba(232, 21, 0, 0.1)';
-                            }
-
-                            // Auto-scale Y axis
-                            const maxSpeed = Math.max(
-                                ...chart.data.datasets[0].data,
-                                ...chart.data.datasets[1].data
-                            );
-                            chart.options.scales.y.suggestedMax = Math.max(maxSpeed * 1.3, 5);
-                            chart.update();
-
-                            // Update speed display with dynamic units
-                            const currentSpeedEl = document.getElementById(`currentSpeed-${routerId}`);
-                            const speedBps = speedValue * 1e6; // Convert Mbps to bps
-                            currentSpeedEl.innerHTML = `<i class="fa fa-tachometer-alt me-1"></i>${formatSpeed(speedBps)}`;
-
-                            // Update badge color based on speed
-                            if (speedValue >= 50) {
-                                currentSpeedEl.className = "badge bg-success-soft text-success";
-                            } else if (speedValue >= 20) {
-                                currentSpeedEl.className = "badge bg-warning-soft text-warning";
-                            } else {
-                                currentSpeedEl.className = "badge bg-danger-soft text-danger";
-                            }
-
-                            updateStats();
-                        })
-                        .catch(err => {
-                            console.error(err);
-                            badge.innerHTML = '<i class="fa fa-times-circle me-1"></i>Error';
-                            badge.className = "badge status-badge bg-danger";
-                            const currentSpeedEl = document.getElementById(`currentSpeed-${routerId}`);
-                            currentSpeedEl.innerHTML = '<i class="fa fa-exclamation-triangle me-1"></i>Error';
-                            currentSpeedEl.className = "badge bg-danger-soft text-danger";
-                            updateStats();
-                        });
-                });
-            }
-
-            // Auto-refresh toggle
-            autoRefreshToggle.addEventListener("change", function() {
-                if (this.checked) {
-                    refreshInterval = setInterval(updateSpeeds, 5000);
-                } else {
-                    clearInterval(refreshInterval);
-                }
-            });
-
-            updateSpeeds();
-            refreshInterval = setInterval(updateSpeeds, 5000);
+        /* ── Collect router IDs from the table ── */
+        document.querySelectorAll('tr[data-router-id]').forEach(row => {
+            routerIds.push(parseInt(row.dataset.routerId));
         });
+
+        /* ── Format helpers ── */
+        function fmtSpeed(bps) {
+            if (bps >= 1e9) return (bps / 1e9).toFixed(2) + ' Gbps';
+            if (bps >= 1e6) return (bps / 1e6).toFixed(2) + ' Mbps';
+            if (bps >= 1e3) return (bps / 1e3).toFixed(1) + ' Kbps';
+            return Math.round(bps) + ' bps';
+        }
+
+        function speedColor(mbps) {
+            if (mbps >= 50) return { border: '#00ba88', bg: 'rgba(0,186,136,0.12)' };
+            if (mbps >= 10) return { border: '#f4a100', bg: 'rgba(244,161,0,0.12)' };
+            return             { border: '#e81500', bg: 'rgba(232,21,0,0.12)' };
+        }
+
+        /* ── Init a mini chart per router ── */
+        function initChart(routerId) {
+            const canvas = document.getElementById(`speedChart-${routerId}`);
+            if (!canvas || charts[routerId]) return;
+
+            charts[routerId] = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'DL', data: [], borderColor: '#00ba88', backgroundColor: 'rgba(0,186,136,0.12)', tension: 0.4, fill: true, borderWidth: 2, pointRadius: 0 },
+                        { label: 'UL', data: [], borderColor: '#0061f2', backgroundColor: 'rgba(0,97,242,0.12)',   tension: 0.4, fill: true, borderWidth: 2, pointRadius: 0 },
+                    ]
+                },
+                options: {
+                    responsive: false, animation: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false, beginAtZero: true, suggestedMax: 5 }
+                    }
+                }
+            });
+        }
+
+        routerIds.forEach(initChart);
+
+        /* ── Update one router row from WS data ── */
+        function updateRow(id, d) {
+            const rid = parseInt(id);
+
+            /* Status badge */
+            const badge = document.getElementById(`status-${rid}`);
+            if (badge) {
+                if (d.status === 'offline' || d.status === 'error') {
+                    badge.innerHTML  = '<i class="fa fa-times-circle me-1"></i>Offline';
+                    badge.className  = 'badge status-badge bg-danger';
+                } else {
+                    badge.innerHTML  = '<i class="fa fa-check-circle me-1"></i>Online';
+                    badge.className  = 'badge status-badge bg-success';
+                }
+            }
+
+            if (d.status === 'offline' || d.status === 'error') return;
+
+            /* CPU bar */
+            const cpuBar = document.getElementById(`cpuBar-${rid}`);
+            const cpuVal = document.getElementById(`cpuVal-${rid}`);
+            if (cpuBar) cpuBar.style.width = (d.cpu || 0) + '%';
+            if (cpuBar) cpuBar.className   = `progress-bar ${d.cpu > 80 ? 'bg-danger' : d.cpu > 50 ? 'bg-warning' : 'bg-primary'}`;
+            if (cpuVal) cpuVal.textContent = (d.cpu || 0) + '%';
+
+            /* RAM bar */
+            const memBar = document.getElementById(`memBar-${rid}`);
+            const memVal = document.getElementById(`memVal-${rid}`);
+            if (memBar) memBar.style.width = (d.memory || 0) + '%';
+            if (memBar) memBar.className   = `progress-bar ${d.memory > 85 ? 'bg-danger' : d.memory > 60 ? 'bg-warning' : 'bg-success'}`;
+            if (memVal) memVal.textContent = (d.memory || 0) + '%';
+
+            /* Uptime */
+            const uptime = document.getElementById(`uptime-${rid}`);
+            if (uptime) uptime.textContent = d.uptime || '—';
+
+            /* Hostname */
+            const hn = document.getElementById(`hostname-${rid}`);
+            if (hn && d.hostname) hn.textContent = d.hostname;
+
+            /* Speed chart */
+            const chart = charts[rid];
+            if (!chart) return;
+
+            const rxMbps = parseFloat(d.rx) || 0;
+            const txMbps = parseFloat(d.tx) || 0;
+            const now    = new Date().toLocaleTimeString();
+
+            chart.data.labels.push(now);
+            chart.data.datasets[0].data.push(rxMbps);
+            chart.data.datasets[1].data.push(txMbps);
+
+            if (chart.data.labels.length > MAX_POINTS) {
+                chart.data.labels.shift();
+                chart.data.datasets.forEach(ds => ds.data.shift());
+            }
+
+            /* Dynamic colour based on download speed */
+            const col = speedColor(rxMbps);
+            chart.data.datasets[0].borderColor      = col.border;
+            chart.data.datasets[0].backgroundColor  = col.bg;
+
+            const maxV = Math.max(...chart.data.datasets[0].data, ...chart.data.datasets[1].data, 1);
+            chart.options.scales.y.suggestedMax = maxV * 1.3;
+            chart.update('none');
+
+            /* Speed badges */
+            const dlEl = document.getElementById(`speed-dl-${rid}`);
+            const ulEl = document.getElementById(`speed-ul-${rid}`);
+            if (dlEl) dlEl.innerHTML = `<i class="fa fa-arrow-down"></i> ${fmtSpeed(rxMbps * 1e6)}`;
+            if (ulEl) ulEl.innerHTML = `<i class="fa fa-arrow-up"></i> ${fmtSpeed(txMbps * 1e6)}`;
+
+            updateStats();
+        }
+
+        /* ── Header stats ── */
+        function updateStats() {
+            let online = 0, offline = 0, totalRx = 0;
+
+            document.querySelectorAll('tr[data-router-id]').forEach(row => {
+                const rid   = row.dataset.routerId;
+                const badge = document.getElementById(`status-${rid}`);
+                if (!badge) return;
+
+                if (badge.classList.contains('bg-success')) { online++; }
+                else if (badge.classList.contains('bg-danger'))  { offline++; }
+
+                const chart = charts[rid];
+                if (chart && chart.data.datasets[0].data.length) {
+                    totalRx += chart.data.datasets[0].data.at(-1) || 0;
+                }
+            });
+
+            document.getElementById('statOnline').textContent  = online;
+            document.getElementById('statOffline').textContent = offline;
+            document.getElementById('onlineRouters').innerHTML = `<i class="fa fa-circle me-1"></i>${online} Online`;
+            document.getElementById('offlineRouters').innerHTML= `<i class="fa fa-circle me-1"></i>${offline} Offline`;
+            document.getElementById('statAvgSpeed').textContent= fmtSpeed(totalRx * 1e6);
+        }
+
+        /* ── WS status badge ── */
+        function setWsStatus(state) {
+            const badge = document.getElementById('wsStatusBadge');
+            const spinner = document.getElementById('liveSpinner');
+            const map = {
+                connecting: ['bg-warning-soft text-warning', 'Connecting...', true],
+                online:     ['bg-success-soft text-success', 'Live',          true],
+                offline:    ['bg-danger-soft text-danger',   'Disconnected',  false],
+            };
+            const [cls, label, spin] = map[state] || map.connecting;
+            badge.className  = `badge ${cls}`;
+            badge.innerHTML  = `<i class="fa fa-circle me-1"></i>${label}`;
+            if (spinner) spinner.style.display = spin ? '' : 'none';
+        }
+
+        /* ── WebSocket — one connection, subscribe to all routers ── */
+        let ws         = null;
+        let pendingSubs = [...routerIds];  // subscribe after open
+
+        function connectWS() {
+            setWsStatus('connecting');
+            ws = new WebSocket('wss://billing.inovatech.co.ke/ws');
+
+            ws.onopen = () => {
+                setWsStatus('online');
+                /* Subscribe to every router this user has */
+                pendingSubs.forEach(rid => {
+                    ws.send(JSON.stringify({ type: 'subscribe', router_id: rid }));
+                });
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const d = JSON.parse(event.data);
+                    /* d comes from getRouterStats — it has router_id? No —
+                       the server broadcasts per router_id subscription,
+                       so we need to know which router sent this.
+                       The server needs to include router_id in the payload. */
+                    if (d.router_id) {
+                        updateRow(d.router_id, d);
+                    }
+                } catch(e) {}
+            };
+
+            ws.onerror = () => setWsStatus('offline');
+
+            ws.onclose = () => {
+                setWsStatus('offline');
+                ws = null;
+                setTimeout(connectWS, 3000);
+            };
+        }
+
+        if (routerIds.length) connectWS();
+
+    })();
     </script>
 
     <!-- Action Buttons -->
     <script>
-        document.addEventListener("click", e => {
-            if (e.target.closest(".delete-router")) {
-                const id = e.target.closest(".delete-router").dataset.id;
-                if (confirm("Are you sure you want to delete this router?")) {
-                    window.location.href = `delete.php?id=${id}`;
-                }
+        document.addEventListener("click", function(e) {
+            if (e.target.closest(".view-router")) {
+                let btn = e.target.closest(".view-router");
+                let id  = btn.dataset.id;
+                document.getElementById("routerModalName").innerText = btn.dataset.name;
+                fetch("router_info.php?id=" + id)
+                    .then(res => res.json())
+                    .then(data => {
+                        routerModel.innerText   = data.model;
+                        routerFirmware.innerText = data.version;
+                        routerUptime.innerText  = data.uptime;
+                        routerCPU.innerText     = data.cpu + "%";
+                        let used    = data.total_memory - data.free_memory;
+                        let percent = (used / data.total_memory) * 100;
+                        ramProgress.style.width  = percent + "%";
+                        ramProgress.innerText    = percent.toFixed(1) + "%";
+                        ramTotal.innerText       = (data.total_memory / 1024 / 1024).toFixed(1) + " MB";
+                        ramFree.innerText        = (data.free_memory  / 1024 / 1024).toFixed(1) + " MB";
+                    });
             }
         });
     </script>
 
 </body>
-
 </html>
+
+<?php require_once "router_modals.php"; ?>
 
 <!-- Add Router Modal -->
 <div class="modal fade" id="addRouterModal" tabindex="-1">
@@ -503,7 +548,7 @@ $routers = $pdo->query("SELECT * FROM routers ORDER BY name")->fetchAll();
                         <div class="col-12">
                             <div class="alert alert-info mb-0">
                                 <i class="fas fa-info-circle me-2"></i>
-                                <strong>Note:</strong> Ensure the API service is enabled on your MikroTik router and the credentials have sufficient permissions.
+                                <strong>Note:</strong> Ensure the API service is enabled on your MikroTik and the credentials have sufficient permissions.
                             </div>
                         </div>
                     </div>

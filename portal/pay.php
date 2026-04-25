@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once "../core/db.php";
-require_once "../core/pesaflux.php";
+require_once "../core/index.php";
 
 $token = $_SESSION['payment_token'] ?? null;
 if (!$token) exit("Session expired");
@@ -18,23 +18,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $phone = preg_replace('/^0/', '254', $_POST['phone']);
 
+    $provider = getPaymentProvider($payment['router_id']);
+
     $response = stkPush(
+        $provider,
+        $payment['router_id'],
         $payment['amount'],
         $phone,
         "H-Payment"
     );
 
-    if (!empty($response['transaction_request_id'])) {
+    error_log("STEP 1 PROVIDER FROM DB: " . $provider);
+
+    $transaction_id = null;
+
+if ($provider === 'mpesa') {
+    $transaction_id = $response['CheckoutRequestID'] ?? null;
+
+} elseif ($provider === 'intasend') {
+    $transaction_id = $response['invoice']['invoice_id'] ?? null;
+
+
+} else {
+    $transaction_id = $response['transaction_request_id'] ?? null;
+}
+
+    if (!empty($transaction_id))  {
 
         // SAVE PHONE + TX
         $pdo->prepare("
-            UPDATE payments
-            SET transaction_request_id=?,
-                phone=?
-            WHERE payment_id=?
-        ")->execute([
-            $response['transaction_request_id'],
+    UPDATE payments
+    SET transaction_request_id=?,
+        phone=?,
+        provider=?
+    WHERE payment_id=?
+")->execute([
+            $transaction_id,
             $phone,
+            $provider,
             $payment['payment_id']
         ]);
 
@@ -55,6 +76,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <script>
         // check DB directly instead of verify script
+
+// setInterval(() => {
+
+//     fetch("payment_status_intasend.php")
+//         .then(res => res.text())
+//         .then(status => {
+
+//             if (status === "ACTIVE") {
+//                 window.location = "create.php";
+//             }
+
+//         });
+
+// }, 3000);
+
+
         setInterval(() => {
 
             fetch("payment_status.php")

@@ -1,91 +1,182 @@
+<?php
+session_start();
 
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="utf-8" />
-        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-        <meta name="description" content="" />
-        <meta name="author" content="" />
-        <title>Create Account - Material Admin Pro</title>
-        <!-- Load Favicon-->
-        <link href="assets/img/favicon.ico" rel="shortcut icon" type="image/x-icon" />
-        <!-- Load Material Icons from Google Fonts-->
-        <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet" />
-        <!-- Roboto and Roboto Mono fonts from Google Fonts-->
-        <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,500" rel="stylesheet" />
-        <!-- Load main stylesheet-->
-        <link href="css/styles.css" rel="stylesheet" />
-    </head>
-    <body class="bg-primary">
-        <!-- Layout wrapper-->
-        <div id="layoutAuthentication">
-            <!-- Layout content-->
-            <div id="layoutAuthentication_content">
-                <!-- Main page content-->
-                <main>
-                    <!-- Main content container-->
-                    <div class="container">
-                        <div class="row justify-content-center">
-                            <div class="col-xxl-7 col-xl-10">
-                                <div class="card card-raised shadow-10 mt-5 mt-xl-10 mb-5">
-                                    <div class="card-body p-5">
-                                        <!-- Auth header with logo image-->
-                                        <div class="text-center">
-                                            <img class="mb-3" src="assets/img/icons/background.svg" alt="..." style="height: 48px" />
-                                            <h1 class="display-5 mb-0">Create New Account</h1>
-                                            <div class="subheading-1 mb-5">to continue to app</div>
+// If user already logged in, go to dashboard
+if (isset($_SESSION['user'])) {
+    header("Location: ../dashboard/");
+    exit;
+}
+
+require_once "../partials/head.php";
+?>
+
+<body class="bg-pattern-waihou">
+    <!-- Layout wrapper -->
+    <div id="layoutAuthentication">
+        <!-- Layout content -->
+        <div id="layoutAuthentication_content">
+            <main>
+                <div class="container">
+                    <div class="row justify-content-center">
+                        <div class="col-xxl-10 col-xl-10 col-lg-12">
+                            <div class="card card-raised shadow-10 mt-5 mt-xl-10 mb-4">
+                                <div class="row g-0">
+
+                                    <!-- Register form column -->
+                                    <div class="col-lg-5 col-md-6">
+                                        <div class="card-body p-5">
+                                            <!-- Header -->
+                                            <div class="text-center">
+                                                <img class="mb-3" src="../assets/favicon.png" alt="Logo" style="height: 48px" />
+                                                <h1 class="display-5 mb-0">Create Account</h1>
+                                                <div class="subheading-1 mb-5">to continue</div>
+                                            </div>
+
+                                            <!-- Flash messages -->
+                                            <?php if (isset($_SESSION['error'])): ?>
+                                                <div class="alert alert-danger">
+                                                    <?= $_SESSION['error']; unset($_SESSION['error']); ?>
+                                                </div>
+                                            <?php endif; ?>
+
+                                            <?php if (isset($_SESSION['success'])): ?>
+                                                <div class="alert alert-success">
+                                                    <?= $_SESSION['success']; unset($_SESSION['success']); ?>
+                                                </div>
+                                            <?php endif; ?>
+
+                                            <?php if (isset($_SESSION['warning'])): ?>
+                                                <div class="alert alert-warning">
+                                                    <?= $_SESSION['warning']; unset($_SESSION['warning']); ?>
+                                                </div>
+                                            <?php endif; ?>
+
+                                            <!-- Register form -->
+                                            <form method="POST" action="../auth/process_register.php" class="mb-5">
+
+                                                <div class="mb-4">
+                                                    <input type="text" name="full_names" class="form-control" placeholder="Full Name" required>
+                                                </div>
+
+                                                <div class="mb-4">
+                                                    <input type="text" name="username" id="username" class="form-control" placeholder="Username">
+                                                    <small id="usernameMsg"></small>
+                                                </div>
+
+                                                <div class="mb-4">
+                                                    <input type="email" name="email" id="email" class="form-control" placeholder="Email Address">
+                                                    <small id="emailMsg"></small>
+                                                </div>
+
+                                                <div class="mb-4">
+                                                    <input type="tel" name="phone_number" class="form-control" placeholder="Phone Number">
+                                                </div>
+
+                                                <div class="mb-4">
+                                                    <input type="password" name="password" id="password" class="form-control" placeholder="Password">
+                                                    <small id="passwordMsg"></small>
+                                                </div>
+
+                                                <div class="mb-4">
+                                                    <input type="password" name="confirm_password" class="form-control" placeholder="Confirm Password" required>
+                                                </div>
+
+                                                <div class="d-flex align-items-center justify-content-between mt-4">
+                                                    <a class="small fw-500 text-decoration-none" href="login">Already have an account? Sign in</a>
+                                                    <button type="submit" class="btn btn-primary">Create Account</button>
+                                                </div>
+
+                                            </form>
                                         </div>
-                                        <!-- Register new account form-->
-                                        <form>
-                                            <div class="row">
-                                                <div class="col-sm-6 mb-4"><mwc-textfield class="w-100" label="First Name" outlined=""></mwc-textfield></div>
-                                                <div class="col-sm-6 mb-4"><mwc-textfield class="w-100" label="Last Name" outlined=""></mwc-textfield></div>
-                                            </div>
-                                            <div class="mb-4"><mwc-textfield class="w-100" label="Email Address" outlined=""></mwc-textfield></div>
-                                            <div class="row">
-                                                <div class="col-sm-6 mb-4"><mwc-textfield class="w-100" label="Password" outlined="" icontrailing="visibility_off" type="password"></mwc-textfield></div>
-                                                <div class="col-sm-6 mb-4"><mwc-textfield class="w-100" label="Verify Password" outlined="" icontrailing="visibility_off" type="password"></mwc-textfield></div>
-                                            </div>
-                                            <div class="d-flex align-items-center">
-                                                <mwc-formfield label="I agree to the website terms and conditions"><mwc-checkbox></mwc-checkbox></mwc-formfield>
-                                            </div>
-                                            <div class="form-group d-flex align-items-center justify-content-between mt-4 mb-0">
-                                                <a class="small fw-500 text-decoration-none" href="app-auth-login-basic.html">Sign in instead</a>
-                                                <a class="btn btn-primary" href="app-auth-login-basic.html">Create Account</a>
-                                            </div>
-                                        </form>
                                     </div>
+
+                                    <!-- Background image column -->
+                                    <div class="col-lg-7 col-md-6 d-none d-md-block"
+                                        style="background-image: url('../assets/img/bg1.jpg');
+                                                background-size: cover;
+                                                background-repeat: no-repeat;
+                                                background-position: center;">
+                                    </div>
+
                                 </div>
                             </div>
                         </div>
                     </div>
-                </main>
-            </div>
-            <!-- Layout footer-->
-            <div id="layoutAuthentication_footer">
-                <!-- Auth footer-->
-                <footer class="p-4">
-                    <div class="d-flex flex-column flex-sm-row align-items-center justify-content-between small">
-                        <div class="me-sm-3 mb-2 mb-sm-0"><div class="fw-500 text-white">Copyright © Your Website 2023</div></div>
-                        <div class="ms-sm-3">
-                            <a class="fw-500 text-decoration-none link-white" href="#!">Privacy</a>
-                            <a class="fw-500 text-decoration-none link-white mx-4" href="#!">Terms</a>
-                            <a class="fw-500 text-decoration-none link-white" href="#!">Help</a>
-                        </div>
-                    </div>
-                </footer>
-            </div>
+                </div>
+            </main>
         </div>
-        <!-- Load Bootstrap JS bundle-->
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
-        <!-- Load global scripts-->
-        <script type="module" src="js/material.js"></script>
-        <script src="js/scripts.js"></script>
+        <div id="layoutAuthentication_footer">
+            <?php require_once "../partials/footer.php"; ?>
+        </div>
+    </div>
 
-        <script src="https://assets.startbootstrap.com/js/sb-customizer.js"></script>
-        <sb-customizer project="material-admin-pro"></sb-customizer>
-    <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"6e2c2575ac8f44ed824cef7899ba8463","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+    <?php require_once "../partials/scripts.php"; ?>
+    <script>
+        function checkUsername(value) {
+            let msg = document.getElementById("usernameMsg");
+            if (value.length < 3) {
+                msg.innerHTML = "Username must be at least 3 characters";
+                msg.style.color = "orange";
+                return;
+            }
+            fetch("../auth/check_user.php?type=username&value=" + value)
+                .then(r => r.text())
+                .then(data => {
+                    if (data === "taken") {
+                        msg.innerHTML = "❌ Username already taken";
+                        msg.style.color = "red";
+                    } else {
+                        msg.innerHTML = "✔ Username available";
+                        msg.style.color = "green";
+                    }
+                });
+        }
+
+        function checkEmail(value) {
+            let msg = document.getElementById("emailMsg");
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailPattern.test(value)) {
+                msg.innerHTML = "❌ Invalid email format";
+                msg.style.color = "red";
+                return;
+            }
+            fetch("../auth/check_user.php?type=email&value=" + value)
+                .then(r => r.text())
+                .then(data => {
+                    if (data === "taken") {
+                        msg.innerHTML = "❌ Email already registered";
+                        msg.style.color = "red";
+                    } else {
+                        msg.innerHTML = "✔ Email available";
+                        msg.style.color = "green";
+                    }
+                });
+        }
+
+        function checkPassword(value) {
+            let msg = document.getElementById("passwordMsg");
+            let strength = 0;
+            if (value.length >= 8) strength++;
+            if (/[A-Z]/.test(value)) strength++;
+            if (/[0-9]/.test(value)) strength++;
+            if (/[^A-Za-z0-9]/.test(value)) strength++;
+            if (value.length === 0) { msg.innerHTML = ""; return; }
+            if (strength <= 1) {
+                msg.innerHTML = "Weak password";
+                msg.style.color = "red";
+            } else if (strength === 2) {
+                msg.innerHTML = "Medium password";
+                msg.style.color = "orange";
+            } else {
+                msg.innerHTML = "Strong password";
+                msg.style.color = "green";
+            }
+        }
+
+        document.getElementById("username").addEventListener("keyup", function() { checkUsername(this.value); });
+        document.getElementById("email").addEventListener("keyup", function() { checkEmail(this.value); });
+        document.getElementById("password").addEventListener("keyup", function() { checkPassword(this.value); });
+    </script>
 </body>
+
 </html>

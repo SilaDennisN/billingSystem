@@ -1,30 +1,23 @@
 <?php
 
 date_default_timezone_set('Africa/Nairobi');
-require_once __DIR__ . "/config/config.php";
-
-require_once __DIR__ . "/../core/db.php";
-require_once __DIR__ . "/../core/router.php";
-require_once __DIR__ . "/../core/sms.php";
-
-
-use RouterOS\Query;
-
 
 /* =================================================
-   CREATE LOG DIRECTORY
+   READ INPUT ONCE — TOP OF FILE
 ================================================= */
+$raw  = file_get_contents("php://input");
+$data = json_decode($raw, true);
 
+/* =================================================
+   LOG DIRECTORY — BEFORE ANYTHING ELSE
+================================================= */
 $logDir = __DIR__ . "/logs";
-
 if (!is_dir($logDir)) {
     mkdir($logDir, 0777, true);
 }
 
-function logMsg($file, $msg)
-{
+function logMsg($file, $msg) {
     global $logDir;
-
     file_put_contents(
         $logDir . "/" . $file . "_" . date("Ymd") . ".log",
         date("H:i:s") . " | " . $msg . PHP_EOL,
@@ -32,127 +25,202 @@ function logMsg($file, $msg)
     );
 }
 
-
-/* =================================================
-   ROUTER SAFE QUERY (Detect !trap)
-================================================= */
-
-function routerQuery($client, Query $query)
-{
+function routerQuery($client, $query) {
     $response = $client->query($query)->read();
-
     foreach ($response as $r) {
         if (isset($r['!trap'])) {
             throw new Exception("Router trap: " . json_encode($r));
         }
     }
-
     return $response;
 }
 
-
-
 /* =================================================
-   READ WEBHOOK
+   LOG EVERYTHING THAT ARRIVES
 ================================================= */
-
-$raw = file_get_contents("php://input");
-logMsg("pesaflux", $raw);
-
-$data = json_decode($raw, true);
+logMsg("raw", $raw);
 
 if (!$data) {
+    logMsg("errors", "Invalid JSON received");
     http_response_code(400);
     exit("Invalid JSON");
 }
 
+logMsg("debug", "Keys received: " . implode(", ", array_keys($data)));
+
+/* =================================================
+   INTASEND CHALLENGE
+   Always respond to challenge first.
+   Use output buffering so DB output doesn't conflict.
+================================================= */
+if (isset($data['challenge'])) {
+
+    logMsg("debug", "Challenge received. invoice_id present: " . (isset($data['invoice_id']) ? 'YES' : 'NO'));
+
+    if ($data['challenge'] !== 'Dennissila1256') {
+        logMsg("errors", "Invalid challenge: " . $data['challenge']);
+        http_response_code(403);
+        exit;
+    }
+
+    // Respond to challenge immediately
+    header('Content-Type: application/json');
+    echo json_encode(["challenge" => $data['challenge']]);
+
+    // If no invoice_id this is just a ping — stop here
+    if (!isset($data['invoice_id'])) {
+        logMsg("debug", "Challenge-only ping, no invoice. Exiting.");
+        exit;
+    }
+
+    // Has invoice_id — flush challenge response and continue processing
+    if (function_exists('fastcgi_finish_request')) {
+        fastcgi_finish_request(); // Send HTTP response now, keep PHP running
+    }
+
+    logMsg("debug", "Challenge sent, continuing with payment processing...");
+}
+
+/* =================================================
+   NOW LOAD DEPENDENCIES
+================================================= */
+require_once __DIR__ . "/config/config.php";
+require_once __DIR__ . "/../core/db.php";
+require_once __DIR__ . "/../core/router.php";
+require_once __DIR__ . "/../core/sms.php";
+
+use RouterOS\Query;
+
+/* =================================================
+   DETECT PROVIDER
+================================================= */
+$provider = null;
+
+if (isset($data['TransactionID'])) {
+    $provider = 'pesaflux';
+} elseif (isset($data['Body']['stkCallback'])) {
+    $provider = 'mpesa';
+} elseif (isset($data['invoice_id']) && isset($data['topic'])) {
+    $provider = 'intasend';
+} else {
+    logMsg("errors", "Unknown provider. Keys: " . implode(", ", array_keys($data)));
+    http_response_code(400);
+    exit("Unknown provider");
+}
+
+logMsg("provider", "Detected: $provider");
 
 /* =================================================
    EXTRACT DATA
 ================================================= */
+$transaction_id = null;
+$status         = 'FAILED';
+$receipt        = null;
+$phone          = null;
 
-$transaction_id = $data['TransactionID'] ?? null;
-$status = ($data['ResponseCode'] ?? 1) == 0 ? 'SUCCESS' : 'FAILED';
+if ($provider === 'pesaflux') {
+    $transaction_id = $data['TransactionID'] ?? null;
+    $status         = ($data['ResponseCode'] ?? 1) == 0 ? 'SUCCESS' : 'FAILED';
+}
+
+if ($provider === 'mpesa') {
+    $stk            = $data['Body']['stkCallback'];
+    $transaction_id = $stk['CheckoutRequestID'] ?? null;
+    $status         = ($stk['ResultCode'] ?? 1) == 0 ? 'SUCCESS' : 'FAILED';
+
+    if (!empty($stk['CallbackMetadata']['Item'])) {
+        foreach ($stk['CallbackMetadata']['Item'] as $item) {
+            if ($item['Name'] === 'MpesaReceiptNumber') $receipt = $item['Value'];
+            if ($item['Name'] === 'PhoneNumber')        $phone   = $item['Value'];
+        }
+    }
+    logMsg("mpesa", "Receipt: $receipt | Phone: $phone");
+}
+
+if ($provider === 'intasend') {
+
+    $state          = strtoupper($data['state'] ?? '');
+    $transaction_id = $data['invoice_id'] ?? null;
+    $receipt        = $data['invoice_id'] ?? null;
+    $phone          = $data['account']    ?? null;
+    $status         = ($state === 'COMPLETE') ? 'SUCCESS' : 'FAILED';
+
+    logMsg("intasend", "invoice_id: $transaction_id | state: $state | phone: $phone | status: $status");
+
+    // Skip intermediate states — don't touch the DB, just acknowledge
+    if (in_array($state, ['PENDING', 'PROCESSING'])) {
+        logMsg("intasend", "Intermediate state ($state) — skipping DB update");
+        exit("OK");
+    }
+}
 
 if (!$transaction_id) {
+    logMsg("errors", "transaction_id is empty | provider: $provider");
     http_response_code(400);
     exit("Missing transaction id");
 }
 
+logMsg("debug", "Looking up payment with transaction_request_id = $transaction_id");
 
 /* =================================================
    DB TRANSACTION
 ================================================= */
-
 $pdo->beginTransaction();
 
 try {
 
-    /* LOCK PAYMENT */
     $stmt = $pdo->prepare("
         SELECT * FROM payments
         WHERE transaction_request_id = ?
         LIMIT 1
         FOR UPDATE
     ");
-
     $stmt->execute([$transaction_id]);
     $payment = $stmt->fetch();
 
     if (!$payment) {
-        throw new Exception("Payment not found");
+        // Log ALL pending payments to help diagnose mismatch
+        $all = $pdo->query("SELECT payment_id, transaction_request_id, status FROM payments ORDER BY payment_id DESC LIMIT 10")->fetchAll();
+        logMsg("errors", "Payment not found for: $transaction_id | Recent payments: " . json_encode($all));
+        throw new Exception("Payment not found: $transaction_id");
     }
 
+    logMsg("debug", "Payment found: ID={$payment['payment_id']} status={$payment['status']}");
 
     /* STOP DUPLICATES */
     if (in_array($payment['status'], ['used', 'active'])) {
         $pdo->commit();
+        logMsg("debug", "Already processed: $transaction_id");
         exit("Already processed");
     }
 
-
-    /* FAILED PAYMENT */
+    /* FAILED / CANCELLED PAYMENT */
     if ($status !== 'SUCCESS') {
-
-        $pdo->prepare("
-            UPDATE payments
-            SET status='failed'
-            WHERE payment_id=?
-        ")->execute([$payment['payment_id']]);
-
+        $terminalFail = in_array(strtoupper($data['state'] ?? ''), ['FAILED', 'CANCELLED']);
+        if ($terminalFail) {
+            $pdo->prepare("UPDATE payments SET status='failed' WHERE payment_id=?")
+                ->execute([$payment['payment_id']]);
+            logMsg("intasend", "Payment marked failed: $transaction_id | reason: " . ($data['failed_reason'] ?? 'unknown'));
+        }
         $pdo->commit();
-        exit("Payment failed");
+        exit("Payment not successful");
     }
 
-
     /* LOAD PLAN */
-    $stmt = $pdo->prepare("
-        SELECT * FROM hotspot_profiles
-        WHERE id=? LIMIT 1
-    ");
-
+    $stmt = $pdo->prepare("SELECT * FROM hotspot_profiles WHERE id=? LIMIT 1");
     $stmt->execute([$payment['plan_id']]);
     $plan = $stmt->fetch();
 
-    if (!$plan) {
-        throw new Exception("Invalid hotspot plan");
-    }
-
+    if (!$plan) throw new Exception("Plan not found: " . $payment['plan_id']);
 
     /* CONNECT ROUTER */
     $client = router_connect($payment['router_id']);
-
-    if (!$client) {
-        throw new Exception("Router connection failed");
-    }
-
-    logMsg("router", "Connected to router");
-
+    if (!$client) throw new Exception("Router connection failed");
+    logMsg("router", "Connected");
 
     $username = $payment['username'];
     $password = '123456';
-
-    $limit = null;
+    $limit    = null;
 
     if (!empty($plan['validity_hours'])) {
         $limit = $plan['validity_hours'] . "h";
@@ -160,129 +228,74 @@ try {
         $limit = $plan['validity_days'] . "d";
     }
 
-
-
-    /* =================================================
-   REMOVE ACTIVE SESSION
-================================================= */
-
-    $active = new Query('/ip/hotspot/active/print');
-    $active->where('user', $username);
-
-    $actives = routerQuery($client, $active);
-
-    foreach ($actives as $a) {
-
-        $remove = new Query('/ip/hotspot/active/remove');
-        $remove->equal('.id', $a['.id']);
-
-        routerQuery($client, $remove);
+    /* REMOVE ACTIVE SESSION */
+    $q = new Query('/ip/hotspot/active/print');
+    $q->where('user', $username);
+    foreach (routerQuery($client, $q) as $a) {
+        $r = new Query('/ip/hotspot/active/remove');
+        $r->equal('.id', $a['.id']);
+        routerQuery($client, $r);
     }
-
     logMsg("router", "Active sessions cleared");
 
-
-    /* =================================================
-   REMOVE HOST CACHE (VERY IMPORTANT)
-================================================= */
+    /* REMOVE HOST CACHE */
     $macRouter = strtoupper(implode(":", str_split(substr($username, 4), 2)));
-
-    $host = new Query('/ip/hotspot/host/print');
-    $host->where('mac-address', $macRouter);
-
-    $hosts = routerQuery($client, $host);
-
-    foreach ($hosts as $h) {
-
-        $remove = new Query('/ip/hotspot/host/remove');
-        $remove->equal('.id', $h['.id']);
-
-        routerQuery($client, $remove);
+    $q = new Query('/ip/hotspot/host/print');
+    $q->where('mac-address', $macRouter);
+    foreach (routerQuery($client, $q) as $h) {
+        $r = new Query('/ip/hotspot/host/remove');
+        $r->equal('.id', $h['.id']);
+        routerQuery($client, $r);
     }
-
     logMsg("router", "Host cache cleared");
 
-
-    /* =================================================
-   DELETE OLD USER
-================================================= */
-
-    $check = new Query('/ip/hotspot/user/print');
-    $check->where('name', $username);
-
-    $users = routerQuery($client, $check);
-
-    foreach ($users as $u) {
-
-        $remove = new Query('/ip/hotspot/user/remove');
-        $remove->equal('.id', $u['.id']);
-
-        routerQuery($client, $remove);
+    /* DELETE OLD USER */
+    $q = new Query('/ip/hotspot/user/print');
+    $q->where('name', $username);
+    foreach (routerQuery($client, $q) as $u) {
+        $r = new Query('/ip/hotspot/user/remove');
+        $r->equal('.id', $u['.id']);
+        routerQuery($client, $r);
     }
-
     logMsg("router", "Old user removed");
 
+    /* CREATE NEW USER */
+    $q = new Query('/ip/hotspot/user/add');
+    $q->equal('name',     $username);
+    $q->equal('password', $password);
+    $q->equal('profile',  $plan['profile_name']);
+    $q->equal('comment',  'Paid ' . date("Y-m-d H:i"));
+    if ($limit) $q->equal('limit-uptime', $limit);
+    routerQuery($client, $q);
+    logMsg("router", "User created: $username");
 
-    /* =================================================
-   CREATE NEW USER
-================================================= */
-
-    $add = new Query('/ip/hotspot/user/add');
-    $add->equal('name', $username);
-    $add->equal('password', $password);
-    $add->equal('profile', $plan['profile_name']);
-    $add->equal('comment', 'Paid ' . date("Y-m-d H:i"));
-
-    if ($limit) {
-        $add->equal('limit-uptime', $limit);
+    /* VERIFY USER */
+    $q = new Query('/ip/hotspot/user/print');
+    $q->where('name', $username);
+    if (empty(routerQuery($client, $q))) {
+        throw new Exception("Router failed to create user: $username");
     }
 
-    routerQuery($client, $add);
-
-    logMsg("router", "User created");
-
-
-    /* =================================================
-   VERIFY USER EXISTS (CRITICAL)
-================================================= */
-
-    $verify = new Query('/ip/hotspot/user/print');
-    $verify->where('name', $username);
-
-    $result = routerQuery($client, $verify);
-
-    if (empty($result)) {
-        throw new Exception("Router failed to create user");
-    }
-
-    /* =================================================
-   ADD USER TO THE HOTSPOT USERS TABLE (CRITICAL)
-================================================= */
-
+    /* HOTSPOT USERS TABLE */
     $start  = new DateTime();
     $expire = clone $start;
-
     if (!empty($plan['validity_hours'])) {
         $expire->modify("+{$plan['validity_hours']} hours");
     } elseif (!empty($plan['validity_days'])) {
         $expire->modify("+{$plan['validity_days']} days");
     }
 
-
-
-    $stmt = $pdo->prepare("
-    INSERT INTO hotspot_users
-    (router_id, plan_id, username, user_type, password, starts_at, expires_at, status)
-    VALUES (?, ?, ?, 'hotspot', ?, ?, ?, 'active')
-    ON DUPLICATE KEY UPDATE
-        plan_id    = VALUES(plan_id),
-        password   = VALUES(password),
-        starts_at  = VALUES(starts_at),
-        expires_at = VALUES(expires_at),
-        status     = 'active'
-");
-
-    $stmt->execute([
+    $pdo->prepare("
+        INSERT INTO hotspot_users
+        (router_id, plan_id, username, user_type, password, starts_at, expires_at, status)
+        VALUES (?, ?, ?, 'hotspot', ?, ?, ?, 'active')
+        ON DUPLICATE KEY UPDATE
+            plan_id    = VALUES(plan_id),
+            password   = VALUES(password),
+            starts_at  = VALUES(starts_at),
+            expires_at = VALUES(expires_at),
+            status     = 'active'
+    ")->execute([
         $payment['router_id'],
         $payment['plan_id'],
         $username,
@@ -291,73 +304,38 @@ try {
         $expire->format('Y-m-d H:i:s')
     ]);
 
+    /* WELCOME SMS */
+    $mac        = $username;
+    $payPhone   = $payment['phone'];
 
-    /* =================================================
-   MARK PAYMENT USED
-================================================= */
-
-
-    $mac = $username;
-    $phone = $payment['phone'];
-
-    if (!empty($phone)) {
-
-        $stmt = $pdo->prepare("
-        SELECT id FROM hotspot_devices
-        WHERE mac=?
-        LIMIT 1
-    ");
+    if (!empty($payPhone)) {
+        $stmt = $pdo->prepare("SELECT id FROM hotspot_devices WHERE mac=? LIMIT 1");
         $stmt->execute([$mac]);
 
-        $device = $stmt->fetch();
-
-        if (!$device) {
-
-            // save device
+        if (!$stmt->fetch()) {
             $pdo->prepare("
-            INSERT INTO hotspot_devices (mac, phone, welcome_sms_sent)
-            VALUES (?, ?, 1)
-        ")->execute([$mac, $phone]);
+                INSERT INTO hotspot_devices (mac, phone, welcome_sms_sent) VALUES (?, ?, 1)
+            ")->execute([$mac, $payPhone]);
 
-
-            $message = "PAY G WiFi Active ✅
-
-Check remaining time or reconnect:
-http://portal.inovatech.co.ke
-
-Enjoy fast internet!
-- Inovatech";
-
-            sendSMS($phone, $message);
-
-            logMsg("sms", "Welcome SMS sent to $phone");
+            sendSMS($payPhone,
+                "Welcome to PAYG Network WiFi ✅\n\nYour package is now active.\n\nCheck balance:\nwifi.inovatech.co.ke/status\n\nSupport: 0785633314\n\nEnjoy!"
+            );
+            logMsg("sms", "Welcome SMS sent to $payPhone");
         }
     }
 
-
-
-    /* =================================================
-   MARK PAYMENT USED
-================================================= */
-
+    /* MARK PAYMENT USED */
     $pdo->prepare("
-    UPDATE payments
-    SET status='used',
-        confirmed_at=NOW()
-    WHERE payment_id=?
-")->execute([$payment['payment_id']]);
+        UPDATE payments SET status='used', confirmed_at=NOW() WHERE payment_id=?
+    ")->execute([$payment['payment_id']]);
 
     $pdo->commit();
-
-    logMsg("success", "USER: {$username} | TX: {$transaction_id}");
-
+    logMsg("success", "DONE | USER: $username | TX: $transaction_id | Provider: $provider");
     echo "OK";
+
 } catch (Throwable $e) {
-
     $pdo->rollBack();
-
-    logMsg("errors", $e->getMessage());
-
+    logMsg("errors", "EXCEPTION: " . $e->getMessage() . " | TX: $transaction_id");
     http_response_code(500);
     echo "ERROR";
 }

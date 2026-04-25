@@ -1,25 +1,33 @@
 <?php
 require_once "../core/db.php";
 require_once "../core/auth.php";
+require __DIR__ . '/../subscription/subscription_gate.php';
 
 if (!is_logged_in()) {
     header("Location: ../auth/login");
     exit;
 }
+check_subscription_gate($pdo, $user_id);
 
-$payments = $pdo->query("
-    SELECT 
+
+$stmt = $pdo->prepare("
+    SELECT DISTINCT
         p.*,
         hu.username,
         hu.user_type,
         hp.profile_name,
         r.name AS router_name
     FROM payments p
-LEFT JOIN hotspot_users hu ON hu.username = p.username
-LEFT JOIN hotspot_profiles hp ON hp.id = p.plan_id
-LEFT JOIN routers r ON r.router_id = p.router_id
+    LEFT JOIN hotspot_users hu ON hu.username = p.username
+    LEFT JOIN hotspot_profiles hp ON hp.id = p.plan_id
+    LEFT JOIN routers r ON r.router_id = p.router_id
+    JOIN user_router_access ur ON ur.router_id = p.router_id
+    WHERE ur.user_id = ?
     ORDER BY p.created_at DESC
-")->fetchAll();
+");
+
+$stmt->execute([$user_id]);
+$payments = $stmt->fetchAll();
 
 // Calculate stats
 $totalRevenue = 0;
@@ -35,8 +43,10 @@ foreach ($payments as $p) {
         if (date('Y-m-d', strtotime($p['created_at'])) === date('Y-m-d')) {
             $todayRevenue += $p['amount'];
         }
-    } else {
+    } elseif($p['status'] === 'pending') {
         $pendingPayments++;
+    }else{
+
     }
 }
 ?>
@@ -68,7 +78,7 @@ foreach ($payments as $p) {
                                     <i class="fa fa-hourglass-half me-1"></i><?= $pendingPayments ?> Pending
                                 </span>
                                 <button class="btn btn-sm btn-light" onclick="window.print()">
-                                    <i class="fa fa-print me-1"></i>Export
+                                    <i class="fa fa-print me-1"></i>
                                 </button>
                             </div>
                         </div>

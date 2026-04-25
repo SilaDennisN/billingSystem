@@ -7,7 +7,7 @@ if (!is_logged_in()) {
     exit;
 }
 
-$user_id = $_SESSION['user']['id'];
+$user_id = $_SESSION['user']['id']; // ✅ Correct session format
 
 /* Load current user */
 $stmt = $pdo->prepare("SELECT * FROM users WHERE user_id=?");
@@ -78,10 +78,14 @@ if (!$user) {
                                     </div>
                                 </div>
                                 <div class="col">
-                                    <h3 class="mb-1"><?= htmlspecialchars($user['username']) ?></h3>
+                                    <h3 class="mb-1"><?= htmlspecialchars($user['full_names'] ?: $user['username']) ?></h3>
+                                    <p class="text-muted mb-1">
+                                        <i class="material-icons align-middle me-1" style="font-size: 1.2rem;">alternate_email</i>
+                                        <?= htmlspecialchars($user['username']) ?>
+                                    </p>
                                     <p class="text-muted mb-2">
                                         <i class="material-icons align-middle me-1" style="font-size: 1.2rem;">email</i>
-                                        <?= htmlspecialchars($user['email']) ?>
+                                        <?= $user['email'] ? htmlspecialchars($user['email']) : '<span class="text-muted fst-italic">No email set</span>' ?>
                                     </p>
                                     <div>
                                         <span class="badge rounded-pill bg-<?= $user['role'] == 'admin' ? 'primary' : 'secondary' ?>-soft text-<?= $user['role'] == 'admin' ? 'primary' : 'secondary' ?> me-2">
@@ -129,10 +133,11 @@ if (!$user) {
                                 <div class="card-body p-4">
 
                                     <form method="post" action="update_profile.php">
+
                                         <div class="mb-4">
                                             <label class="form-label small fw-500 text-muted mb-2">
                                                 <i class="material-icons align-middle me-1" style="font-size: 1rem;">badge</i>
-                                                Username
+                                                Username <span class="text-danger">*</span>
                                             </label>
                                             <input type="text" name="username" class="form-control form-control-lg"
                                                 value="<?= htmlspecialchars($user['username']) ?>" required>
@@ -141,12 +146,33 @@ if (!$user) {
 
                                         <div class="mb-4">
                                             <label class="form-label small fw-500 text-muted mb-2">
+                                                <i class="material-icons align-middle me-1" style="font-size: 1rem;">person_outline</i>
+                                                Full Names
+                                            </label>
+                                            <input type="text" name="full_names" class="form-control form-control-lg"
+                                                value="<?= htmlspecialchars($user['full_names'] ?? '') ?>"
+                                                placeholder="Enter your full names">
+                                        </div>
+
+                                        <div class="mb-4">
+                                            <label class="form-label small fw-500 text-muted mb-2">
                                                 <i class="material-icons align-middle me-1" style="font-size: 1rem;">email</i>
                                                 Email Address
                                             </label>
                                             <input type="email" name="email" class="form-control form-control-lg"
-                                                value="<?= htmlspecialchars($user['email']) ?>">
+                                                value="<?= htmlspecialchars($user['email'] ?? '') ?>"
+                                                placeholder="Enter your email">
                                             <div class="form-text">We'll never share your email with anyone else</div>
+                                        </div>
+
+                                        <div class="mb-4">
+                                            <label class="form-label small fw-500 text-muted mb-2">
+                                                <i class="material-icons align-middle me-1" style="font-size: 1rem;">phone</i>
+                                                Phone Number
+                                            </label>
+                                            <input type="text" name="phone_number" class="form-control form-control-lg"
+                                                value="<?= htmlspecialchars($user['phone_number'] ?? '') ?>"
+                                                placeholder="Enter your phone number">
                                         </div>
 
                                         <div class="mb-4">
@@ -216,8 +242,9 @@ if (!$user) {
                                                 <span class="input-group-text bg-light border-end-0">
                                                     <i class="material-icons text-muted">vpn_key</i>
                                                 </span>
-                                                <input type="password" name="new_password" class="form-control border-start-0"
-                                                    placeholder="Enter new password" required>
+                                                <input type="password" name="new_password" id="new_password"
+                                                    class="form-control border-start-0"
+                                                    placeholder="Enter new password" minlength="8" required>
                                             </div>
                                             <div class="form-text">Must be at least 8 characters long</div>
                                         </div>
@@ -231,8 +258,9 @@ if (!$user) {
                                                 <span class="input-group-text bg-light border-end-0">
                                                     <i class="material-icons text-muted">vpn_key</i>
                                                 </span>
-                                                <input type="password" name="confirm_password" class="form-control border-start-0"
-                                                    placeholder="Confirm new password" required>
+                                                <input type="password" name="confirm_password" id="confirm_password"
+                                                    class="form-control border-start-0"
+                                                    placeholder="Confirm new password" minlength="8" required>
                                             </div>
                                         </div>
 
@@ -303,6 +331,19 @@ if (!$user) {
     </div>
 
     <?php require_once "../partials/scripts.php"; ?>
+
+    <script>
+        // Client-side password match validation
+        document.querySelector('form[action="change_password.php"]').addEventListener('submit', function (e) {
+            const np = document.getElementById('new_password').value;
+            const cp = document.getElementById('confirm_password').value;
+            if (np !== cp) {
+                e.preventDefault();
+                alert('New passwords do not match. Please try again.');
+                document.getElementById('confirm_password').focus();
+            }
+        });
+    </script>
 </body>
 
 </html>

@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"/>
+<title>Inovatech — ISP Billing & Hotspot Management</title>
+ <!-- Load Favicon-->
+<link href="assets/favicon.png" rel="shortcut icon" type="image/x-icon" />
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700;800;900&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet"/>
+<style>
+  :root {
+    --ink: #0a0e1a; --ink-soft: #1c2333; --surface: #f4f6fb; --card: #ffffff;
+    --accent: #1651f5; --accent-2: #00d4aa; --accent-glow: rgba(22,81,245,0.18);
+    --muted: #6b7a9b; --border: rgba(22,81,245,0.12); --radius: 16px;
+    --font-head: 'Unbounded', sans-serif; --font-body: 'Outfit', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { font-family: var(--font-body); background: var(--surface); color: var(--ink); font-size: 16px; line-height: 1.65; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  img { display: block; max-width: 100%; height: auto; }
+  a { text-decoration: none; color: inherit; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 1.25rem; }
+  .tag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: .62rem; font-weight: 500; color: var(--accent); background: var(--accent-glow); border: 1px solid var(--border); border-radius: 100px; padding: 4px 14px; letter-spacing: .06em; text-transform: uppercase; }
+  .section-label { text-align: center; margin-bottom: 1rem; }
+  .section-title { font-family: var(--font-head); font-size: clamp(1.3rem, 4vw, 2.3rem); font-weight: 800; line-height: 1.15; text-align: center; margin-bottom: 1rem; color: var(--ink); letter-spacing: -.04em; }
+  .section-sub { text-align: center; color: var(--muted); font-size: .95rem; max-width: 560px; margin: 0 auto 3rem; font-weight: 400; }
+  .btn-primary-cta { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: #fff; font-family: var(--font-head); font-weight: 700; font-size: .7rem; padding: 13px 28px; border-radius: 100px; border: none; cursor: pointer; transition: transform .2s, box-shadow .2s; box-shadow: 0 8px 30px rgba(22,81,245,.35); letter-spacing: .01em; white-space: nowrap; }
+  .btn-primary-cta:hover { transform: translateY(-2px); box-shadow: 0 14px 40px rgba(22,81,245,.45); color: #fff; }
+  .btn-outline-cta { display: inline-flex; align-items: center; gap: 8px; background: transparent; color: var(--ink); font-family: var(--font-head); font-weight: 700; font-size: .7rem; padding: 12px 26px; border-radius: 100px; border: 2px solid var(--border); cursor: pointer; transition: all .2s; letter-spacing: .01em; white-space: nowrap; }
+  .btn-outline-cta:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* NAV */
+  nav { position: sticky; top: 0; z-index: 200; background: rgba(244,246,251,.92); backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); }
+  .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+  .nav-brand { font-family: var(--font-head); font-weight: 900; font-size: 1rem; color: var(--ink); letter-spacing: -.04em; }
+  .nav-brand span { color: var(--accent); }
+  .nav-links { display: flex; align-items: center; gap: 1.8rem; }
+  .nav-links a { font-size: .85rem; font-weight: 500; color: var(--muted); transition: color .2s; }
+  .nav-links a:hover { color: var(--accent); }
+  .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 20px; border-radius: 100px; font-family: var(--font-head); font-weight: 700; font-size: .66rem !important; box-shadow: 0 4px 16px rgba(22,81,245,.3); letter-spacing: .01em; }
+  .nav-hamburger { display: none; flex-direction: column; justify-content: center; gap: 5px; width: 36px; height: 36px; cursor: pointer; background: none; border: none; padding: 4px; }
+  .nav-hamburger span { display: block; height: 2px; background: var(--ink); border-radius: 2px; transition: all .3s; }
+  .nav-hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  .nav-hamburger.open span:nth-child(2) { opacity: 0; }
+  .nav-hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+  .nav-mobile { display: none; position: fixed; top: 60px; left: 0; right: 0; bottom: 0; background: rgba(10,14,26,.97); z-index: 199; flex-direction: column; align-items: center; justify-content: center; gap: 2rem; padding: 2rem; }
+  .nav-mobile.open { display: flex; }
+  .nav-mobile a { font-family: var(--font-head); font-size: 1.3rem; font-weight: 700; color: rgba(255,255,255,.7); letter-spacing: -.02em; transition: color .2s; }
+  .nav-mobile a:hover { color: #fff; }
+  .nav-cta-mob { background: var(--accent) !important; color: #fff !important; padding: 14px 40px; border-radius: 100px; box-shadow: 0 8px 30px rgba(22,81,245,.4); font-size: .95rem !important; }
+
+  /* HERO */
+  .hero { background: var(--ink); overflow: hidden; position: relative; padding: 80px 0 70px; }
+  .hero::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(rgba(22,81,245,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(22,81,245,.07) 1px,transparent 1px); background-size: 40px 40px; pointer-events: none; }
+  .hero::after { content: ''; position: absolute; width: 500px; height: 500px; top: -150px; left: 50%; transform: translateX(-50%); background: radial-gradient(circle,rgba(22,81,245,.3) 0%,transparent 70%); pointer-events: none; }
+  .hero-inner { position: relative; z-index: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 3.5rem; align-items: center; }
+  .hero-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: .62rem; color: var(--accent-2); background: rgba(0,212,170,.1); border: 1px solid rgba(0,212,170,.25); border-radius: 100px; padding: 4px 14px; margin-bottom: 1.25rem; letter-spacing: .08em; text-transform: uppercase; }
+  .hero-eyebrow::before { content: '●'; font-size: .45rem; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .hero h1 { font-family: var(--font-head); font-size: clamp(1.7rem, 4vw, 3.2rem); font-weight: 900; color: #fff; line-height: 1.1; letter-spacing: -.05em; margin-bottom: 1.25rem; }
+  .hero h1 em { font-style: normal; color: var(--accent-2); }
+  .hero-desc { color: rgba(255,255,255,.55); font-size: .95rem; line-height: 1.8; margin-bottom: 1.75rem; }
+  .hero-actions { display: flex; gap: .75rem; flex-wrap: wrap; }
+  .hero-stats { display: flex; gap: 2rem; margin-top: 2.5rem; border-top: 1px solid rgba(255,255,255,.08); padding-top: 1.75rem; flex-wrap: wrap; }
+  .hero-stat-num { font-family: var(--font-head); font-size: 1.6rem; font-weight: 900; color: #fff; letter-spacing: -.04em; }
+  .hero-stat-num span { color: var(--accent-2); }
+  .hero-stat-label { font-size: .63rem; color: rgba(255,255,255,.4); margin-top: 2px; font-family: var(--font-mono); letter-spacing: .04em; }
+  .hero-visual { position: relative; }
+  .dashboard-frame { background: var(--ink-soft); border: 1px solid rgba(255,255,255,.1); border-radius: 16px; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.5),0 0 0 1px rgba(22,81,245,.2); animation: float 6s ease-in-out infinite; }
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+  .df-topbar { background: rgba(255,255,255,.04); border-bottom: 1px solid rgba(255,255,255,.07); padding: 10px 16px; display: flex; align-items: center; gap: 7px; }
+  .df-dot { width: 9px; height: 9px; border-radius: 50%; }
+  .df-dot:nth-child(1){background:#ff5f57}.df-dot:nth-child(2){background:#febc2e}.df-dot:nth-child(3){background:#28c840}
+  .df-title { font-family: var(--font-mono); font-size: .6rem; color: rgba(255,255,255,.3); margin-left: auto; }
+  .df-body { padding: 14px; }
+  .df-metric-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 12px; }
+  .df-metric { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 9px; padding: 11px 10px; }
+  .df-metric-label { font-family: var(--font-mono); font-size: .55rem; color: rgba(255,255,255,.4); text-transform: uppercase; letter-spacing: .06em; }
+  .df-metric-val { font-family: var(--font-head); font-size: 1.1rem; font-weight: 800; color: #fff; margin-top: 3px; letter-spacing: -.03em; }
+  .df-metric-val.green{color:var(--accent-2)}.df-metric-val.blue{color:#6ea8ff}
+  .df-chart { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06); border-radius: 9px; padding: 12px; margin-bottom: 12px; height: 72px; display: flex; align-items: flex-end; gap: 5px; overflow: hidden; }
+  .bar { flex: 1; border-radius: 3px 3px 0 0; background: linear-gradient(180deg,var(--accent) 0%,rgba(22,81,245,.3) 100%); animation: barIn 1s ease forwards; transform-origin: bottom; transform: scaleY(0); }
+  @keyframes barIn { to{transform:scaleY(1)} }
+  .bar:nth-child(1){height:35%;animation-delay:.1s}.bar:nth-child(2){height:55%;animation-delay:.15s}.bar:nth-child(3){height:40%;animation-delay:.2s}.bar:nth-child(4){height:70%;animation-delay:.25s}.bar:nth-child(5){height:50%;animation-delay:.3s}.bar:nth-child(6){height:80%;animation-delay:.35s}.bar:nth-child(7){height:60%;animation-delay:.4s}.bar:nth-child(8){height:90%;animation-delay:.45s;background:linear-gradient(180deg,var(--accent-2) 0%,rgba(0,212,170,.3) 100%)}
+  .df-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .df-list { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06); border-radius: 9px; padding: 10px; }
+  .df-list-title { font-family: var(--font-mono); font-size: .55rem; color: rgba(255,255,255,.35); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+  .df-list-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.05); font-size: .65rem; color: rgba(255,255,255,.65); font-family: var(--font-mono); }
+  .df-list-item:last-child{border-bottom:none}
+  .df-badge{font-size:.55rem;padding:2px 7px;border-radius:100px;font-weight:600}
+  .badge-green{background:rgba(0,212,170,.15);color:var(--accent-2)}.badge-blue{background:rgba(22,81,245,.2);color:#6ea8ff}.badge-red{background:rgba(255,80,80,.15);color:#ff8080}
+
+  /* MARQUEE */
+  .marquee-wrap { background: var(--ink); border-top: 1px solid rgba(255,255,255,.06); border-bottom: 1px solid rgba(255,255,255,.06); overflow: hidden; padding: 12px 0; }
+  .marquee-track { display: flex; gap: 2.5rem; animation: marquee 28s linear infinite; white-space: nowrap; }
+  .marquee-track:hover{animation-play-state:paused}
+  @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  .marquee-item { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: .68rem; color: rgba(255,255,255,.35); letter-spacing: .04em; flex-shrink: 0; }
+  .marquee-item i{color:var(--accent-2);font-size:.65rem}
+
+  /* FEATURES */
+  .features { padding: 80px 0; background: var(--surface); }
+  .features-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.25rem; }
+  .feat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.75rem; transition: transform .25s,box-shadow .25s,border-color .25s; position: relative; overflow: hidden; }
+  .feat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg,var(--accent),var(--accent-2)); transform: scaleX(0); transform-origin: left; transition: transform .3s; }
+  .feat-card:hover{transform:translateY(-5px);box-shadow:0 18px 45px rgba(22,81,245,.1);border-color:var(--accent)}
+  .feat-card:hover::before{transform:scaleX(1)}
+  .feat-icon { width: 48px; height: 48px; border-radius: 12px; background: var(--accent-glow); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 1rem; color: var(--accent); }
+  .feat-card h4 { font-family: var(--font-head); font-size: .85rem; font-weight: 700; margin-bottom: .5rem; color: var(--ink); letter-spacing: -.02em; }
+  .feat-card p { color: var(--muted); font-size: .88rem; line-height: 1.72; }
+  .feat-card-wide { grid-column: span 2; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: center; }
+  .feat-badge { display: inline-block; margin-top: .8rem; font-family: var(--font-mono); font-size: .6rem; color: var(--accent-2); background: rgba(0,212,170,.1); border: 1px solid rgba(0,212,170,.25); border-radius: 100px; padding: 3px 11px; letter-spacing: .06em; }
+
+  /* HOW IT WORKS */
+  .hiw { padding: 80px 0; background: var(--ink); position: relative; overflow: hidden; }
+  .hiw::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(rgba(22,81,245,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(22,81,245,.05) 1px,transparent 1px); background-size: 40px 40px; }
+  .hiw .section-title{color:#fff}.hiw .section-sub{color:rgba(255,255,255,.4)}
+  .hiw-steps { display: grid; grid-template-columns: repeat(4,1fr); gap: 0; position: relative; z-index: 2; }
+  .hiw-step { text-align: center; padding: 1.75rem 1.25rem; position: relative; }
+  .hiw-step:not(:last-child)::after { content: ''; position: absolute; top: 45px; right: 0; width: 50%; height: 2px; background: linear-gradient(90deg,var(--accent),rgba(22,81,245,.2)); transform: translateX(50%); }
+  .hiw-num { width: 58px; height: 58px; border-radius: 50%; background: var(--accent-glow); border: 2px solid var(--accent); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; font-family: var(--font-head); font-size: .95rem; font-weight: 800; color: var(--accent); }
+  .hiw-step h4 { font-family: var(--font-head); font-size: .8rem; font-weight: 700; color: #fff; margin-bottom: .4rem; letter-spacing: -.02em; }
+  .hiw-step p { color: rgba(255,255,255,.45); font-size: .85rem; line-height: 1.6; }
+
+  /* METRICS */
+  .metrics-band { padding: 70px 0; background: var(--surface); }
+  .metrics-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1.25rem; }
+  .metric-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.75rem; text-align: center; position: relative; overflow: hidden; }
+  .metric-card::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg,var(--accent),var(--accent-2)); }
+  .metric-val { font-family: var(--font-head); font-size: 2rem; font-weight: 900; color: var(--ink); letter-spacing: -.05em; margin-bottom: .3rem; }
+  .metric-val span{color:var(--accent)}
+  .metric-label { color: var(--muted); font-size: .75rem; font-family: var(--font-mono); }
+
+  /* INTEGRATIONS */
+  .integrations { padding: 80px 0; background: var(--card); }
+  .int-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1.25rem; margin-top: 2.5rem; }
+  .int-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.75rem; text-align: center; transition: transform .2s,box-shadow .2s; }
+  .int-card:hover{transform:translateY(-4px);box-shadow:0 12px 28px rgba(22,81,245,.08)}
+  .int-icon{font-size:1.8rem;margin-bottom:.9rem;color:var(--accent)}
+  .int-card h5 { font-family: var(--font-head); font-weight: 700; font-size: .75rem; margin-bottom: .3rem; letter-spacing: -.02em; }
+  .int-card p { font-size: .8rem; color: var(--muted); }
+
+  /* COMPARISON */
+  .comparison { padding: 80px 0; background: var(--surface); }
+  .comp-table { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: 0 8px 36px rgba(22,81,245,.06); }
+  .comp-table thead tr th { padding: 1.1rem 1.25rem; text-align: left; font-family: var(--font-head); font-size: .68rem; font-weight: 700; }
+  .comp-table thead tr th:first-child{background:var(--ink);color:rgba(255,255,255,.6)}
+  .comp-table thead tr th:nth-child(2){background:#f0f2f5;color:var(--muted);text-align:center}
+  .comp-table thead tr th:nth-child(3){background:var(--accent);color:#fff;text-align:center}
+  .comp-table tbody tr td { padding: .9rem 1.25rem; border-top: 1px solid var(--border); font-size: .88rem; vertical-align: middle; }
+  .comp-table tbody tr td:first-child{font-weight:600;color:var(--ink)}
+  .comp-table tbody tr td:nth-child(2){text-align:center;color:var(--muted);font-family:var(--font-mono);font-size:.76rem}
+  .comp-table tbody tr td:nth-child(3){text-align:center;font-weight:600;background:rgba(22,81,245,.04);color:var(--accent);font-family:var(--font-mono);font-size:.76rem}
+  .comp-table tbody tr:hover td{background:rgba(22,81,245,.03)}
+  .check{color:var(--accent-2);font-size:1.05rem}
+
+  /* PRICING */
+  .pricing { padding: 80px 0; background: var(--ink); position: relative; overflow: hidden; }
+  .pricing::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(rgba(22,81,245,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(22,81,245,.05) 1px,transparent 1px); background-size: 40px 40px; }
+  .pricing::after { content: ''; position: absolute; width: 600px; height: 600px; bottom: -280px; left: 50%; transform: translateX(-50%); background: radial-gradient(circle,rgba(22,81,245,.2) 0%,transparent 70%); pointer-events: none; }
+  .pricing .section-title{color:#fff}.pricing .section-sub{color:rgba(255,255,255,.4)}
+
+  /* SINGLE PRICING CARD LAYOUT */
+  .pricing-single { display: flex; justify-content: center; position: relative; z-index: 2; }
+  .price-main-card { background: var(--card); border: 2px solid var(--accent); border-radius: 24px; padding: 3rem; max-width: 780px; width: 100%; box-shadow: 0 28px 80px rgba(22,81,245,.4); position: relative; overflow: hidden; }
+  .price-main-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+  .price-card-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem; align-items: start; }
+  .price-left .price-tier { font-family: var(--font-mono); font-size: .65rem; color: var(--accent); text-transform: uppercase; letter-spacing: .12em; margin-bottom: .6rem; }
+  .price-left h3 { font-family: var(--font-head); font-size: 1.5rem; font-weight: 900; color: var(--ink); letter-spacing: -.04em; margin-bottom: .5rem; line-height: 1.1; }
+  .price-left .price-tagline { font-size: .88rem; color: var(--muted); line-height: 1.65; margin-bottom: 1.5rem; }
+  .price-components { display: flex; flex-direction: column; gap: .75rem; margin-bottom: 1.5rem; }
+  .price-component { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.2rem; }
+  .price-component-label { font-family: var(--font-mono); font-size: .58rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+  .price-component-value { font-family: var(--font-head); font-size: 1.5rem; font-weight: 900; color: var(--ink); letter-spacing: -.04em; line-height: 1; }
+  .price-component-value span { font-size: .75rem; font-family: var(--font-mono); font-weight: 500; color: var(--muted); letter-spacing: 0; }
+  .price-component-note { font-size: .72rem; color: var(--muted); margin-top: 3px; font-family: var(--font-mono); }
+  .price-component.highlight { background: var(--accent-glow); border-color: var(--accent); }
+  .price-component.highlight .price-component-value { color: var(--accent); }
+  .price-divider { display: flex; align-items: center; gap: .75rem; margin: .25rem 0; font-family: var(--font-mono); font-size: .65rem; color: var(--muted); }
+  .price-divider::before,.price-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .price-right .price-includes-title { font-family: var(--font-mono); font-size: .62rem; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 1rem; }
+  .price-features { list-style: none; margin-bottom: 1.75rem; }
+  .price-features li { display: flex; align-items: flex-start; gap: 9px; font-size: .86rem; padding: 7px 0; border-bottom: 1px solid var(--border); color: var(--muted); }
+  .price-features li:last-child{border-bottom:none}
+  .price-features li i{color:var(--accent-2);font-size:.78rem;flex-shrink:0;margin-top:3px}
+  .price-cta-wrap { margin-top: auto; }
+  .price-cta { display: block; text-align: center; background: var(--accent); color: #fff; font-family: var(--font-head); font-weight: 700; font-size: .75rem; padding: 14px; border-radius: 100px; transition: all .2s; box-shadow: 0 6px 20px rgba(22,81,245,.35); letter-spacing: .01em; }
+  .price-cta:hover{box-shadow:0 12px 36px rgba(22,81,245,.5);transform:translateY(-2px);color:#fff}
+  .price-trial-note { text-align: center; margin-top: .9rem; font-family: var(--font-mono); font-size: .65rem; color: var(--accent-2); }
+  .price-example-box { background: rgba(0,212,170,.07); border: 1px solid rgba(0,212,170,.2); border-radius: 12px; padding: 1.1rem 1.25rem; margin-top: 1.25rem; }
+  .price-example-box .ex-title { font-family: var(--font-mono); font-size: .6rem; color: var(--accent-2); text-transform: uppercase; letter-spacing: .08em; margin-bottom: .6rem; }
+  .price-example-box .ex-row { display: flex; justify-content: space-between; font-size: .8rem; color: var(--muted); padding: 3px 0; font-family: var(--font-mono); }
+  .price-example-box .ex-row.total { color: var(--ink); font-weight: 700; border-top: 1px solid rgba(0,212,170,.2); margin-top: .4rem; padding-top: .6rem; }
+
+  /* TESTIMONIALS */
+  .testimonials { padding: 80px 0; background: var(--surface); }
+  .testi-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.25rem; }
+  .testi-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.75rem; transition: transform .2s,box-shadow .2s; }
+  .testi-card:hover{transform:translateY(-4px);box-shadow:0 12px 38px rgba(22,81,245,.08)}
+  .testi-quote { font-size: 2.8rem; color: var(--accent); line-height: .8; font-family: Georgia,serif; margin-bottom: .9rem; }
+  .testi-text { color: var(--ink); font-size: .9rem; line-height: 1.78; margin-bottom: 1.25rem; }
+  .testi-author { display: flex; align-items: center; gap: 11px; }
+  .testi-avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-family: var(--font-head); font-weight: 800; font-size: .78rem; color: #fff; flex-shrink: 0; }
+  .testi-name { font-family: var(--font-head); font-weight: 700; font-size: .83rem; letter-spacing: -.02em; }
+  .testi-role { font-size: .72rem; color: var(--muted); font-family: var(--font-mono); }
+  .testi-stars { color: #fbbf24; font-size: .78rem; margin-top: .2rem; }
+
+  /* FAQ */
+  .faq { padding: 80px 0; background: var(--card); }
+  .faq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; max-width: 900px; margin: 0 auto; }
+  .faq-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.35rem; cursor: pointer; transition: border-color .2s; }
+  .faq-item:hover{border-color:var(--accent)}
+  .faq-q { font-family: var(--font-head); font-weight: 700; font-size: .78rem; color: var(--ink); display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; letter-spacing: -.01em; line-height: 1.4; }
+  .faq-q i{color:var(--accent);flex-shrink:0;margin-top:2px}
+  .faq-a { font-size: .86rem; color: var(--muted); margin-top: .75rem; line-height: 1.72; }
+
+  /* CTA */
+  .cta-section { padding: 80px 0; background: var(--accent); position: relative; overflow: hidden; }
+  .cta-section::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 20% 50%,rgba(255,255,255,.1) 0%,transparent 60%),radial-gradient(circle at 80% 50%,rgba(0,0,0,.1) 0%,transparent 60%); }
+  .cta-inner { text-align: center; position: relative; z-index: 2; }
+  .cta-inner h2 { font-family: var(--font-head); font-size: clamp(1.4rem,3.5vw,2.3rem); font-weight: 900; color: #fff; margin-bottom: 1rem; letter-spacing: -.05em; }
+  .cta-inner p { color: rgba(255,255,255,.7); font-size: .95rem; margin-bottom: 2.25rem; }
+  .cta-btns { display: flex; gap: .9rem; justify-content: center; flex-wrap: wrap; }
+  .btn-cta-white { display: inline-flex; align-items: center; gap: 8px; background: #fff; color: var(--accent); font-family: var(--font-head); font-weight: 700; font-size: .72rem; padding: 13px 28px; border-radius: 100px; border: none; transition: transform .2s,box-shadow .2s; box-shadow: 0 8px 28px rgba(0,0,0,.15); }
+  .btn-cta-white:hover{transform:translateY(-2px);box-shadow:0 14px 38px rgba(0,0,0,.2);color:var(--accent)}
+  .btn-cta-ghost { display: inline-flex; align-items: center; gap: 8px; background: transparent; color: #fff; font-family: var(--font-head); font-weight: 700; font-size: .72rem; padding: 12px 26px; border-radius: 100px; border: 2px solid rgba(255,255,255,.4); transition: all .2s; }
+  .btn-cta-ghost:hover{border-color:#fff;background:rgba(255,255,255,.1)}
+
+  /* FOOTER */
+  footer { background: var(--ink); padding: 56px 0 28px; }
+  .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 2.5rem; margin-bottom: 2.5rem; }
+  .footer-brand { font-family: var(--font-head); font-weight: 900; font-size: 1rem; color: #fff; margin-bottom: .75rem; letter-spacing: -.04em; }
+  .footer-brand span{color:var(--accent)}
+  .footer-tagline { font-size: .83rem; color: rgba(255,255,255,.35); line-height: 1.75; }
+  .footer-col h6 { font-family: var(--font-mono); font-size: .62rem; color: rgba(255,255,255,.5); text-transform: uppercase; letter-spacing: .1em; margin-bottom: .9rem; }
+  .footer-col a { display: block; font-size: .83rem; color: rgba(255,255,255,.4); margin-bottom: .55rem; transition: color .2s; }
+  .footer-col a:hover{color:#fff}
+  .footer-bottom { border-top: 1px solid rgba(255,255,255,.08); padding-top: 1.4rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+  .footer-bottom p { font-size: .72rem; color: rgba(255,255,255,.25); font-family: var(--font-mono); }
+  .footer-socials { display: flex; gap: .7rem; }
+  .footer-socials a { width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.4); font-size: .85rem; transition: all .2s; }
+  .footer-socials a:hover{border-color:var(--accent);color:var(--accent)}
+
+  [data-reveal] { opacity: 0; transform: translateY(24px); transition: opacity .55s ease,transform .55s ease; }
+  [data-reveal].visible { opacity: 1; transform: translateY(0); }
+
+  /* ══ TABLET ≤ 960px ══ */
+  @media (max-width: 960px) {
+    .nav-links { display: none; }
+    .nav-hamburger { display: flex; }
+    .hero-inner { grid-template-columns: 1fr; }
+    .hero-visual { display: none; }
+    .features-grid { grid-template-columns: 1fr 1fr; }
+    .feat-card-wide { grid-column: span 2; grid-template-columns: 1fr 1fr; }
+    .hiw-steps { grid-template-columns: 1fr 1fr; row-gap: 1rem; }
+    .hiw-step::after { display: none; }
+    .metrics-grid { grid-template-columns: 1fr 1fr; }
+    .int-grid { grid-template-columns: 1fr 1fr; }
+    .price-card-inner { grid-template-columns: 1fr; gap: 1.75rem; }
+    .price-main-card { padding: 2.25rem; }
+    .testi-grid { grid-template-columns: 1fr 1fr; }
+    .faq-grid { grid-template-columns: 1fr; }
+    .footer-grid { grid-template-columns: 1fr 1fr; gap: 2rem; }
+  }
+
+  /* ══ MOBILE ≤ 600px ══ */
+  @media (max-width: 600px) {
+    .container { padding: 0 1rem; }
+    .hero { padding: 52px 0 44px; }
+    .hero h1 { font-size: clamp(1.5rem,7.5vw,2rem); letter-spacing: -.04em; }
+    .hero-desc { font-size: .88rem; }
+    .hero-eyebrow { font-size: .58rem; }
+    .hero-actions { flex-direction: column; }
+    .hero-actions a { width: 100%; justify-content: center; }
+    .hero-stats { gap: 1.25rem; }
+    .hero-stat-num { font-size: 1.35rem; }
+
+    .features { padding: 60px 0; }
+    .features-grid { grid-template-columns: 1fr; }
+    .feat-card-wide { grid-column: span 1; grid-template-columns: 1fr; }
+
+    .hiw { padding: 60px 0; }
+    .hiw-steps { grid-template-columns: 1fr; }
+    .hiw-step { padding: 1.25rem 1rem; }
+
+    .metrics-band { padding: 52px 0; }
+    .metrics-grid { grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .metric-val { font-size: 1.7rem; }
+
+    .integrations { padding: 60px 0; }
+    .int-grid { grid-template-columns: 1fr 1fr; gap: .9rem; }
+    .int-card { padding: 1.25rem 1rem; }
+
+    .comparison { padding: 60px 0; }
+    .comp-table thead tr th { padding: .8rem .9rem; font-size: .6rem; }
+    .comp-table tbody tr td { padding: .75rem .9rem; font-size: .8rem; }
+    .comp-table tbody tr td:nth-child(2) { display: none; }
+    .comp-table thead tr th:nth-child(2) { display: none; }
+
+    .pricing { padding: 60px 0; }
+    .price-main-card { padding: 1.5rem; }
+    .price-card-inner { gap: 1.25rem; }
+    .price-component-value { font-size: 1.25rem; }
+
+    .testimonials { padding: 60px 0; }
+    .testi-grid { grid-template-columns: 1fr; }
+
+    .faq { padding: 60px 0; }
+    .faq-q { font-size: .75rem; }
+
+    .cta-section { padding: 60px 0; }
+    .cta-btns { flex-direction: column; align-items: center; }
+    .btn-cta-white, .btn-cta-ghost { width: 100%; max-width: 320px; justify-content: center; }
+
+    .footer-grid { grid-template-columns: 1fr; gap: 1.75rem; }
+    .footer-bottom { flex-direction: column; align-items: flex-start; gap: .75rem; }
+
+    .section-title { letter-spacing: -.03em; }
+    .section-sub { font-size: .88rem; margin-bottom: 2.25rem; }
+    .marquee-item { font-size: .6rem; }
+  }
+
+  /* ══ TINY ≤ 380px ══ */
+  @media (max-width: 380px) {
+    .hero h1 { font-size: 1.4rem; }
+    .int-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="container nav-inner">
+    <div class="nav-brand">Inova<span>tech</span></div>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#how-it-works">How It Works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+      <a href="auth/login">Login</a>
+      <a href="auth/register" class="nav-cta">Get Started</a>
+    </div>
+    <button class="nav-hamburger" id="hamburger" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<div class="nav-mobile" id="navMobile">
+  <a href="#features" class="mob-link">Features</a>
+  <a href="#how-it-works" class="mob-link">How It Works</a>
+  <a href="#pricing" class="mob-link">Pricing</a>
+  <a href="#faq" class="mob-link">FAQ</a>
+  <a href="auth/login" class="mob-link">Login</a>
+  <a href="auth/register" class="nav-cta-mob">Get Started</a>
+</div>
+
+<section class="hero">
+  <div class="container hero-inner">
+    <div>
+      <div class="hero-eyebrow">Live ISP Automation Platform</div>
+      <h1>The <em>Smartest</em> Way to Run Your ISP Business</h1>
+      <p class="hero-desc">Automate billing, manage MikroTik hotspot & PPPoE networks, track income and grow your internet service business — all from one powerful system.</p>
+      <div class="hero-actions">
+        <a href="#pricing" class="btn-primary-cta"><i class="fa fa-rocket"></i> Start Free Trial</a>
+        <a href="#how-it-works" class="btn-outline-cta" style="color:#fff;border-color:rgba(255,255,255,.2)"><i class="fa fa-play-circle"></i> See How It Works</a>
+      </div>
+      <div class="hero-stats">
+        <div><div class="hero-stat-num">500<span>+</span></div><div class="hero-stat-label">Active ISPs</div></div>
+        <div><div class="hero-stat-num">KES 2M<span>+</span></div><div class="hero-stat-label">Processed Monthly</div></div>
+        <div><div class="hero-stat-num">99.9<span>%</span></div><div class="hero-stat-label">Uptime SLA</div></div>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="dashboard-frame">
+        <div class="df-topbar"><div class="df-dot"></div><div class="df-dot"></div><div class="df-dot"></div><div class="df-title">Inovatech Dashboard</div></div>
+        <div class="df-body">
+          <div class="df-metric-row">
+            <div class="df-metric"><div class="df-metric-label">Active Users</div><div class="df-metric-val blue">1,247</div></div>
+            <div class="df-metric"><div class="df-metric-label">Today's Revenue</div><div class="df-metric-val green">KES 24K</div></div>
+            <div class="df-metric"><div class="df-metric-label">Routers Online</div><div class="df-metric-val">8/8</div></div>
+          </div>
+          <div class="df-chart"><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div></div>
+          <div class="df-row">
+            <div class="df-list">
+              <div class="df-list-title">Recent Payments</div>
+              <div class="df-list-item"><span>John M.</span><span class="df-badge badge-green">KES 500</span></div>
+              <div class="df-list-item"><span>Sarah K.</span><span class="df-badge badge-green">KES 1,000</span></div>
+              <div class="df-list-item"><span>Peter O.</span><span class="df-badge badge-blue">KES 400</span></div>
+              <div class="df-list-item"><span>Grace W.</span><span class="df-badge badge-green">KES 200</span></div>
+            </div>
+            <div class="df-list">
+              <div class="df-list-title">User Status</div>
+              <div class="df-list-item"><span>Hotspot</span><span class="df-badge badge-green">Active</span></div>
+              <div class="df-list-item"><span>PPPoE</span><span class="df-badge badge-blue">Online</span></div>
+              <div class="df-list-item"><span>Expired</span><span class="df-badge badge-red">8 users</span></div>
+              <div class="df-list-item"><span>WireGuard</span><span class="df-badge badge-green">Active</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="marquee-wrap">
+  <div class="marquee-track">
+    <div class="marquee-item"><i class="fa fa-check-circle"></i> Automatic payment activation</div>
+    <div class="marquee-item"><i class="fa fa-check-circle"></i> MikroTik API integration</div>
+    <div class="marquee-item"><i class="fa fa-check-circle"></i> WireGuard VPN support</div>
+    <div class="marquee-item"><i class="fa fa-check-circle"></i> PPPoE user management</div>
+    <div class="marquee-item"><i class="fa fa-check-circle"></i> M-Pesa / Mobile money</div>
+    <div class="marquee-item"><i class="fa fa-check-circle"></i> Multi-router support</div>
+    <div class="marquee-item"><i class="fa fa-check-circle"></i> Daily income reports</div>
+    <div class="marquee-item"><i class="fa fa-check-circle"></i> Customer SMS alerts</div>
+    <div class="marquee-item"><i class="fa fa-check-circle"></i> Automatic payment activation</div>
+    <div class="marquee-item"><i class="fa fa-check-circle"></i> MikroTik API integration</div>
+    <div class="marquee-item"><i class="fa fa-check-circle"></i> WireGuard VPN support</div>
+    <div class="marquee-item"><i class="fa fa-check-circle"></i> PPPoE user management</div>
+    <div class="marquee-item"><i class="fa fa-check-circle"></i> M-Pesa / Mobile money</div>
+    <div class="marquee-item"><i class="fa fa-check-circle"></i> Multi-router support</div>
+    <div class="marquee-item"><i class="fa fa-check-circle"></i> Daily income reports</div>
+    <div class="marquee-item"><i class="fa fa-check-circle"></i> Customer SMS alerts</div>
+  </div>
+</div>
+
+<section id="features" class="features">
+  <div class="container">
+    <div class="section-label"><span class="tag"><i class="fa fa-bolt"></i> Core Features</span></div>
+    <h2 class="section-title" data-reveal>Everything Your ISP Needs in One Place</h2>
+    <p class="section-sub" data-reveal>Purpose-built for MikroTik-powered ISPs in Kenya and East Africa.</p>
+    <div class="features-grid">
+      <div class="feat-card" data-reveal><div class="feat-icon"><i class="fa fa-wifi"></i></div><h4>Hotspot Automation</h4><p>Manage hotspot users directly from the billing panel. Auto-activate sessions on payment — no manual router logins required.</p><span class="feat-badge">✓ MikroTik API</span></div>
+      <div class="feat-card" data-reveal><div class="feat-icon"><i class="fa fa-exchange"></i></div><h4>PPPoE Management</h4><p>Create, edit and suspend PPPoE customers. Manage profiles, speeds and monitor active connections in real time.</p><span class="feat-badge">✓ Real-time monitoring</span></div>
+      <div class="feat-card" data-reveal><div class="feat-icon"><i class="fa fa-money"></i></div><h4>M-Pesa Auto Payments</h4><p>Receive M-Pesa payments and the system instantly activates internet packages. Zero manual intervention needed.</p><span class="feat-badge">✓ Instant activation</span></div>
+      <div class="feat-card feat-card-wide" data-reveal>
+        <div><div class="feat-icon"><i class="fa fa-bar-chart"></i></div><h4>Advanced Revenue Reports</h4><p>Track income across hotspot and PPPoE networks. View daily, weekly and monthly reports broken down by router, package and customer type.</p><span class="feat-badge">✓ PDF & Excel export</span></div>
+        <div style="background:var(--accent-glow);border:1px solid var(--border);border-radius:12px;padding:1.25rem">
+          <div style="display:flex;justify-content:space-between;margin-bottom:.9rem;font-size:.7rem;color:var(--muted);font-family:var(--font-mono)"><span>Monthly Revenue</span><span style="color:var(--accent);font-weight:600">+18%</span></div>
+          <div style="display:flex;align-items:flex-end;gap:5px;height:70px">
+            <div style="flex:1;background:var(--accent);border-radius:3px 3px 0 0;height:40%;opacity:.4"></div>
+            <div style="flex:1;background:var(--accent);border-radius:3px 3px 0 0;height:60%;opacity:.5"></div>
+            <div style="flex:1;background:var(--accent);border-radius:3px 3px 0 0;height:45%;opacity:.5"></div>
+            <div style="flex:1;background:var(--accent);border-radius:3px 3px 0 0;height:75%;opacity:.6"></div>
+            <div style="flex:1;background:var(--accent);border-radius:3px 3px 0 0;height:55%;opacity:.6"></div>
+            <div style="flex:1;background:var(--accent-2);border-radius:3px 3px 0 0;height:100%"></div>
+          </div>
+        </div>
+      </div>
+      <div class="feat-card" data-reveal><div class="feat-icon"><i class="fa fa-server"></i></div><h4>Multi-Router Control</h4><p>Manage tens of MikroTik routers from a single dashboard. Add new routers instantly as your network grows.</p><span class="feat-badge">✓ Unlimited routers</span></div>
+      <div class="feat-card" data-reveal><div class="feat-icon"><i class="fa fa-lock"></i></div><h4>WireGuard VPN</h4><p>Manage WireGuard tunnels on supported MikroTik hardware (RB951Ui and newer). Secure site-to-site and client VPN from the dashboard.</p><span class="feat-badge">✓ RB951Ui+ supported</span></div>
+      <div class="feat-card" data-reveal><div class="feat-icon"><i class="fa fa-users"></i></div><h4>Customer Management</h4><p>Full customer records with payment history, active packages and contact details. Search and filter instantly.</p><span class="feat-badge">✓ Full history</span></div>
+      <div class="feat-card" data-reveal><div class="feat-icon"><i class="fa fa-comment"></i></div><h4>Automated SMS Alerts</h4><p>Automatically notify customers when their package is activated, about to expire or has been suspended.</p><span class="feat-badge">✓ Custom templates</span></div>
+      <div class="feat-card" data-reveal><div class="feat-icon"><i class="fa fa-shield"></i></div><h4>Multi-Staff Access</h4><p>Create staff accounts with role-based permissions. Control who can access billing, reports and router settings.</p><span class="feat-badge">✓ Role-based access</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="how-it-works" class="hiw">
+  <div class="container">
+    <div class="section-label" style="text-align:center;margin-bottom:1rem"><span class="tag" style="color:var(--accent-2);background:rgba(0,212,170,.1);border-color:rgba(0,212,170,.25)"><i class="fa fa-map-o"></i> Simple Setup</span></div>
+    <h2 class="section-title" data-reveal>Up and Running in Minutes</h2>
+    <p class="section-sub" data-reveal>No technical degree required. Connect, configure, and automate.</p>
+    <div class="hiw-steps">
+      <div class="hiw-step" data-reveal><div class="hiw-num">1</div><h4>Connect Your Router</h4><p>Add your MikroTik router using its IP and API credentials. Supports RB951Ui and all newer models.</p></div>
+      <div class="hiw-step" data-reveal><div class="hiw-num">2</div><h4>Create Packages</h4><p>Set up hotspot or PPPoE packages with speed limits, prices and validity periods.</p></div>
+      <div class="hiw-step" data-reveal><div class="hiw-num">3</div><h4>Accept Payments</h4><p>Share your M-Pesa Paybill. Payments are tracked automatically in real time.</p></div>
+      <div class="hiw-step" data-reveal><div class="hiw-num">4</div><h4>Auto-Activate</h4><p>Internet activates the moment payment lands. Customers get SMS confirmation instantly.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="metrics-band">
+  <div class="container">
+    <div class="metrics-grid">
+      <div class="metric-card" data-reveal><div class="metric-val">500<span>+</span></div><div class="metric-label">ISPs Using the Platform</div></div>
+      <div class="metric-card" data-reveal><div class="metric-val">2M<span>+</span></div><div class="metric-label">KES Processed Monthly</div></div>
+      <div class="metric-card" data-reveal><div class="metric-val">99.9<span>%</span></div><div class="metric-label">System Uptime</div></div>
+      <div class="metric-card" data-reveal><div class="metric-val">0<span>hrs</span></div><div class="metric-label">Manual Activation Time</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="integrations">
+  <div class="container">
+    <div class="section-label"><span class="tag"><i class="fa fa-plug"></i> Integrations</span></div>
+    <h2 class="section-title" data-reveal>Works With the Tools You Already Use</h2>
+    <p class="section-sub" data-reveal>Deep native integrations — not shallow plugins.</p>
+    <div class="int-grid">
+      <div class="int-card" data-reveal><div class="int-icon"><i class="fa fa-rss"></i></div><h5>MikroTik RouterOS</h5><p>Direct API — RB951Ui and newer, including RB, CCR, CRS &amp; CHR</p></div>
+      <div class="int-card" data-reveal><div class="int-icon"><i class="fa fa-mobile"></i></div><h5>M-Pesa Daraja</h5><p>Safaricom STK push & C2B automation</p></div>
+      <div class="int-card" data-reveal><div class="int-icon"><i class="fa fa-comment-o"></i></div><h5>SMS Gateway</h5><p>Automated alerts via local SMS providers</p></div>
+      <div class="int-card" data-reveal><div class="int-icon"><i class="fa fa-lock"></i></div><h5>WireGuard VPN</h5><p>Secure tunnel management on capable MikroTik hardware</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="comparison">
+  <div class="container">
+    <div class="section-label"><span class="tag"><i class="fa fa-balance-scale"></i> Comparison</span></div>
+    <h2 class="section-title" data-reveal>Why Switch to Inovatech?</h2>
+    <p class="section-sub" data-reveal>Stop wasting hours on manual work your competitors automated months ago.</p>
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <table class="comp-table" data-reveal style="min-width:480px">
+        <thead><tr><th>Feature</th><th>❌ Manual</th><th>✅ Inovatech</th></tr></thead>
+        <tbody>
+          <tr><td>User Activation</td><td>Manual router login every time</td><td class="check">⚡ Instant after payment</td></tr>
+          <tr><td>Payment Confirmation</td><td>Check M-Pesa messages manually</td><td class="check">⚡ Real-time auto detection</td></tr>
+          <tr><td>Income Reporting</td><td>Manual Excel calculations</td><td class="check">⚡ Live dashboard + export</td></tr>
+          <tr><td>Multiple Routers</td><td>Log into each separately</td><td class="check">⚡ All in one panel</td></tr>
+          <tr><td>Customer Records</td><td>Paper books or files</td><td class="check">⚡ Searchable digital records</td></tr>
+          <tr><td>User Suspension</td><td>Manual daily check required</td><td class="check">⚡ Automatic at expiry</td></tr>
+          <tr><td>WireGuard Management</td><td>Manual CLI on each router</td><td class="check">⚡ Dashboard control (RB951Ui+)</td></tr>
+          <tr><td>Notifications</td><td>Call or text each customer</td><td class="check">⚡ Automated SMS instantly</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="pricing" class="pricing">
+  <div class="container">
+    <div class="section-label" style="text-align:center;margin-bottom:1rem"><span class="tag" style="color:var(--accent-2);background:rgba(0,212,170,.1);border-color:rgba(0,212,170,.25)"><i class="fa fa-tag"></i> Transparent Pricing</span></div>
+    <h2 class="section-title" data-reveal>Pay Only for What You Earn</h2>
+    <p class="section-sub" data-reveal>No fixed monthly plans. No hidden fees. You grow, we grow together.</p>
+
+    <div class="pricing-single" data-reveal>
+      <div class="price-main-card">
+        <div class="price-card-inner">
+
+          <!-- LEFT: cost breakdown -->
+          <div class="price-left">
+            <div class="price-tier">How Pricing Works</div>
+            <h3>Simple, Fair &amp; Scalable</h3>
+            <p class="price-tagline">Your cost is tied directly to your revenue — the more you earn, the more we both grow. No upfront fees, no surprise invoices.</p>
+
+            <div class="price-components">
+              <div class="price-component highlight">
+                <div class="price-component-label">Platform Fee</div>
+                <div class="price-component-value">5<span>% of monthly billed income</span></div>
+                <div class="price-component-note">Charged on total revenue processed through the system</div>
+              </div>
+
+              <div class="price-divider">+</div>
+
+              <div class="price-component">
+                <div class="price-component-label">Payment Gateway</div>
+                <div class="price-component-value">KES 400<span> / month</span></div>
+                <div class="price-component-note">M-Pesa Daraja integration &amp; auto-activation</div>
+              </div>
+            </div>
+
+            <!-- Example calculation -->
+            <div class="price-example-box">
+              <div class="ex-title">📊 Example — Monthly Bill</div>
+              <div class="ex-row"><span>Your billed income</span><span>KES 30,000</span></div>
+              <div class="ex-row"><span>Platform fee (5%)</span><span>KES 1,500</span></div>
+              <div class="ex-row"><span>Payment gateway</span><span>KES 400</span></div>
+              <div class="ex-row total"><span>Total cost to you</span><span>KES 1,900</span></div>
+            </div>
+          </div>
+
+          <!-- RIGHT: what's included -->
+          <div class="price-right">
+            <div class="price-includes-title">Everything Included — No Tiers</div>
+            <ul class="price-features">
+              <li><i class="fa fa-check"></i> Unlimited MikroTik Routers (RB951Ui+)</li>
+              <li><i class="fa fa-check"></i> Hotspot &amp; PPPoE management</li>
+              <li><i class="fa fa-check"></i> WireGuard VPN management</li>
+              <li><i class="fa fa-check"></i> M-Pesa auto-activation (gateway add-on)</li>
+              <li><i class="fa fa-check"></i> Advanced income reports</li>
+              <li><i class="fa fa-check"></i> PDF &amp; Excel export</li>
+              <li><i class="fa fa-check"></i> Automated SMS alerts</li>
+              <li><i class="fa fa-check"></i> Unlimited staff &amp; reseller accounts</li>
+              <li><i class="fa fa-check"></i> Multi-router dashboard</li>
+              <li><i class="fa fa-check"></i> White-label option</li>
+              <li><i class="fa fa-check"></i> API access</li>
+              <li><i class="fa fa-check"></i> Priority support</li>
+            </ul>
+
+            <div class="price-cta-wrap">
+              <a href="auth/register" class="price-cta"><i class="fa fa-rocket"></i> &nbsp;Start Free 14-Day Trial →</a>
+              <div class="price-trial-note">✓ No credit card required &nbsp;·&nbsp; ✓ Full access during trial</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <p style="text-align:center;margin-top:2rem;color:rgba(255,255,255,.3);font-size:.72rem;font-family:var(--font-mono)">14-day free trial · No credit card required · Cancel any time</p>
+  </div>
+</section>
+
+<section class="testimonials">
+  <div class="container">
+    <div class="section-label"><span class="tag"><i class="fa fa-star"></i> Customer Stories</span></div>
+    <h2 class="section-title" data-reveal>Trusted by ISP Owners Across Kenya</h2>
+    <p class="section-sub" data-reveal>Real results from real network operators.</p>
+    <div class="testi-grid">
+      <div class="testi-card" data-reveal>
+        <div class="testi-quote">"</div>
+        <p class="testi-text">This billing system automated our hotspot payments completely. We used to spend 3 hours a day manually activating users. Now it's zero. Our revenue went up because we stopped losing customers during delays.</p>
+        <div class="testi-author"><div class="testi-avatar">JM</div><div><div class="testi-name">James Mwangi</div><div class="testi-role">ISP Owner · Nairobi</div><div class="testi-stars">★★★★★</div></div></div>
+      </div>
+      <div class="testi-card" data-reveal>
+        <div class="testi-quote">"</div>
+        <p class="testi-text">Managing 8 routers across our network was a nightmare before Inovatech. Now I can see all routers, active users and daily income from my phone. The reports alone are worth the subscription.</p>
+        <div class="testi-author"><div class="testi-avatar" style="background:var(--accent-2);color:var(--ink)">PO</div><div><div class="testi-name">Peter Otieno</div><div class="testi-role">Network Admin · Kisumu</div><div class="testi-stars">★★★★★</div></div></div>
+      </div>
+      <div class="testi-card" data-reveal>
+        <div class="testi-quote">"</div>
+        <p class="testi-text">The WireGuard management feature is brilliant. We run secure tunnels across our network sites and the system handles it all from the dashboard. Customer SMS alerts reduced our support calls by 60%.</p>
+        <div class="testi-author"><div class="testi-avatar" style="background:#7c3aed">BK</div><div><div class="testi-name">Brian Kiptoo</div><div class="testi-role">ISP Technician · Eldoret</div><div class="testi-stars">★★★★★</div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="faq" class="faq">
+  <div class="container">
+    <div class="section-label"><span class="tag"><i class="fa fa-question-circle"></i> FAQ</span></div>
+    <h2 class="section-title" data-reveal>Frequently Asked Questions</h2>
+    <p class="section-sub" data-reveal>Everything you need to know before signing up.</p>
+    <div class="faq-grid">
+      <div class="faq-item" data-reveal><div class="faq-q">Which MikroTik models are supported? <i class="fa fa-plus"></i></div><div class="faq-a">We support MikroTik routers capable of running WireGuard — starting from the RB951Ui and any more powerful model. This includes the RB series (RB1100, RB3011, RB4011), CCR (Cloud Core Router), CRS series, and CHR (Cloud Hosted Router). Entry-level models below RB951Ui, such as the hAP mini or RB750r2, are not supported.</div></div>
+      <div class="faq-item" data-reveal><div class="faq-q">How does M-Pesa integration work? <i class="fa fa-plus"></i></div><div class="faq-a">We integrate with Safaricom Daraja API via your Paybill or Till number. Payments are detected in real time and users are activated within seconds. The payment gateway add-on is KES 400/month.</div></div>
+      <div class="faq-item" data-reveal><div class="faq-q">Can I manage both hotspot and PPPoE? <i class="fa fa-plus"></i></div><div class="faq-a">Yes. All accounts support both hotspot and PPPoE (username/password) networks from a single dashboard — no tier restrictions.</div></div>
+      <div class="faq-item" data-reveal><div class="faq-q">Is there a free trial? <i class="fa fa-plus"></i></div><div class="faq-a">Yes — all accounts include a 14-day free trial with no credit card required. Explore the full system before committing.</div></div>
+      <div class="faq-item" data-reveal><div class="faq-q">How is the 5% platform fee calculated? <i class="fa fa-plus"></i></div><div class="faq-a">The 5% fee is applied to your total monthly billed income processed through the platform — hotspot and PPPoE included. It is billed at the end of each month based on actual collected revenue.</div></div>
+      <div class="faq-item" data-reveal><div class="faq-q">Can my resellers manage customers? <i class="fa fa-plus"></i></div><div class="faq-a">Yes. You can create reseller accounts with limited access so they can manage assigned customers without seeing your full dashboard or income reports.</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="cta-section">
+  <div class="container cta-inner">
+    <h2>Ready to Automate Your ISP?</h2>
+    <p>Join 500+ ISP owners who stopped doing manual work and started growing their business with Inovatech.</p>
+    <div class="cta-btns">
+      <a href="auth/register" class="btn-cta-white"><i class="fa fa-rocket"></i> Start Free 14-Day Trial</a>
+      <a href="#" class="btn-cta-ghost"><i class="fa fa-phone"></i> Talk to Sales</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-brand">Inova<span>tech</span></div>
+        <p class="footer-tagline">The complete billing and automation platform for MikroTik ISPs in Kenya and East Africa. Built by ISP operators, for ISP operators.</p>
+      </div>
+      <div class="footer-col"><h6>Product</h6><a href="#">Features</a><a href="#">Pricing</a><a href="#">Integrations</a><a href="#">Changelog</a></div>
+      <div class="footer-col"><h6>Support</h6><a href="#">Documentation</a><a href="#">Video Tutorials</a><a href="#">Contact Us</a><a href="#">WhatsApp Support</a></div>
+      <div class="footer-col"><h6>Company</h6><a href="#">About Us</a><a href="#">Blog</a><a href="#">Terms of Service</a><a href="#">Privacy Policy</a></div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2026 Inovatech. All rights reserved.</p>
+      <div class="footer-socials">
+        <a href="#"><i class="fa fa-twitter"></i></a>
+        <a href="#"><i class="fa fa-facebook"></i></a>
+        <a href="#"><i class="fa fa-whatsapp"></i></a>
+        <a href="#"><i class="fa fa-youtube-play"></i></a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+// Hamburger
+const hamburger = document.getElementById('hamburger');
+const navMobile = document.getElementById('navMobile');
+hamburger.addEventListener('click', () => {
+  hamburger.classList.toggle('open');
+  navMobile.classList.toggle('open');
+  document.body.style.overflow = navMobile.classList.contains('open') ? 'hidden' : '';
+});
+document.querySelectorAll('.mob-link, .nav-cta-mob').forEach(l => {
+  l.addEventListener('click', () => {
+    hamburger.classList.remove('open');
+    navMobile.classList.remove('open');
+    document.body.style.overflow = '';
+  });
+});
+
+// Scroll reveal
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach((e, i) => {
+    if (e.isIntersecting) setTimeout(() => e.target.classList.add('visible'), i * 55);
+  });
+}, { threshold: 0.08 });
+document.querySelectorAll('[data-reveal]').forEach(el => observer.observe(el));
+
+// FAQ accordion
+document.querySelectorAll('.faq-item').forEach(item => {
+  const ans = item.querySelector('.faq-a');
+  const ico = item.querySelector('.faq-q i');
+  ans.style.display = 'none';
+  item.addEventListener('click', () => {
+    const open = ans.style.display === 'block';
+    ans.style.display = open ? 'none' : 'block';
+    ico.className = open ? 'fa fa-plus' : 'fa fa-minus';
+  });
+});
+</script>
+</body>
+</html>

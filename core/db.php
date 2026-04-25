@@ -2,6 +2,7 @@
 
 $config = require __DIR__ . '/../config/config.php';
 
+
 try {
     $pdo = new PDO(
         "mysql:host={$config['db']['host']};dbname={$config['db']['name']};charset=utf8mb4",
@@ -15,3 +16,5 @@ try {
 } catch (PDOException $e) {
     die("Database connection failed");
 }
+
+

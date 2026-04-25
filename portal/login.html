@@ -1,24 +1,123 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
+<title>Connecting...</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- CRITICAL: Never start captive flow with HTTPS -->
-<meta http-equiv="refresh"
-content="0; url=http://inovatech.co.ke/billing/portal/index.php?mac=$(mac)&ip=$(ip)&username=$(username)&link-login=$(link-login)&link-login-only=$(link-login-only)&link-orig=$(link-orig)&error=$(error)&chap-id=$(chap-id)&chap-challenge=$(chap-challenge)&server-name=$(server-name)&identity=$(identity)">
+<style>
+    body {
+        background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+        color: #fff;
+        padding: 20px;
+    }
 
-<title>Redirecting...</title>
+    .container {
+        width: 100%;
+        max-width: 380px;
+    }
 
-<!-- Backup redirect for stubborn phones -->
-<script>
-window.location.replace(
-"http://inovatech.co.ke/billing/portal/index.php?mac=$(mac)&ip=$(ip)&username=$(username)&link-login=$(link-login)&link-login-only=$(link-login-only)&link-orig=$(link-orig)&error=$(error)&chap-id=$(chap-id)&chap-challenge=$(chap-challenge)&server-name=$(server-name)&identity=$(identity)"
-);
-</script>
+    .header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
 
+    .header h1 {
+        font-size: 24px;
+        margin: 0 0 10px 0;
+        font-weight: 600;
+    }
+
+    .header p {
+        font-size: 14px;
+        margin: 8px 0;
+        opacity: 0.9;
+    }
+
+    .card {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #ffffff;
+        padding: 30px 20px;
+        border-radius: 16px;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    .loader {
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-top: 4px solid #ffffff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 20px auto;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .small {
+        font-size: 13px;
+        color: #e0e0e0;
+    }
+
+    .help-text {
+        font-size: 13px;
+        margin-top: 4px;
+    }
+
+    .help-text a {
+        color: #fff;
+        text-decoration: underline;
+    }
+</style>
 </head>
 
 <body>
-Redirecting to login...
+
+<div class="container">
+    <div class="card">
+        <h2 id="title">Loading Packages...</h2>
+        <div class="loader"></div>
+        <p class="small">This will only take a moment</p>
+    </div>
+</div>
+
+<form id="redirectForm" action="https://billing.inovatech.co.ke/portal/index" method="post">
+    <input type="hidden" name="mac" value="$(mac)">
+    <input type="hidden" name="ip" value="$(ip)">
+    <input type="hidden" name="username" value="$(username)">
+    <input type="hidden" name="link-login" value="$(link-login)">
+    <input type="hidden" name="link-login-only" value="$(link-login-only)">
+    <input type="hidden" name="link-orig" value="$(link-orig)">
+    <input type="hidden" name="error" value="$(error)">
+
+    <!-- Hardcoded Router ID -->
+    <input type="hidden" name="router_id" value="1">
+</form>
+
+<script>
+    // Detect reconnecting users (username already exists)
+    const isReconnect = "$(username)" !== "";
+
+    if (isReconnect) {
+        document.getElementById("title").innerText = "Welcome back 👋";
+    }
+
+    // Delay submit slightly so UI renders (prevents freeze)
+    setTimeout(() => {
+        document.getElementById("redirectForm").submit();
+    }, 600);
+</script>
+
 </body>
 </html>
