@@ -36,12 +36,15 @@ $stmt->execute([$user_id]);
 $subscription = $stmt->fetch();
 
 /* ======================
-   FETCH USER'S OWN MPESA API KEYS
+   FETCH USER'S OWN GATEWAY API KEYS (any provider)
 ====================== */
-$stmt = $pdo->prepare("SELECT * FROM user_api_keys WHERE user_id = ? AND provider = 'mpesa' LIMIT 1");
+$stmt = $pdo->prepare("SELECT * FROM user_api_keys WHERE user_id = ? AND provider IN ('mpesa','pesaflux','intasend') LIMIT 1");
 $stmt->execute([$user_id]);
-$ownApiKeys = $stmt->fetch();
-$hasOwnKeys = !empty($ownApiKeys);
+$ownApiKeys   = $stmt->fetch();
+$hasOwnKeys   = !empty($ownApiKeys);
+$ownProvider  = $hasOwnKeys ? strtolower($ownApiKeys['provider']) : null;
+// M-Pesa and IntaSend own keys are free — PesaFlux uses platform billing
+$ownKeysFree  = ($ownProvider === 'mpesa' || $ownProvider === 'intasend');
 
 /* ======================
    MONTHLY BILLED INCOME
@@ -66,8 +69,8 @@ if (!empty($router_ids)) {
 
 $platformFee   = round($monthlyIncome * 0.05, 2);
 $gatewayActive = $subscription && $subscription['gateway_enabled'] == 1;
-// If user has own API keys, no gateway fee is charged
-$gatewayFeeApplies = $gatewayActive && !$hasOwnKeys;
+// Gateway fee waived only for M-Pesa own-key users; pesaflux/intasend own-key users still pay
+$gatewayFeeApplies = $gatewayActive && !($hasOwnKeys && $ownKeysFree);
 $totalDue      = $platformFee; // gateway fee billed separately via gateway_invoices
 
 /* ======================
@@ -81,7 +84,7 @@ $gatewayId        = $subscription['gateway_identifier'] ?? null;
 $gatewayBank      = $subscription['gateway_bank']       ?? null;
 $gatewayExpiresAt = $subscription['gateway_expires_at'] ?? null;
 
-if ($gatewayActive && $gatewayExpiresAt && !$hasOwnKeys) {
+if ($gatewayActive && $gatewayExpiresAt && !($hasOwnKeys && $ownKeysFree)) {
     $now      = new DateTime();
     $expiry   = new DateTime($gatewayExpiresAt);
     $gatewayExpired  = $expiry <= $now;
@@ -177,62 +180,165 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ── Delete own API keys ───────────────────────────────────
     if ($action === 'delete_own_keys') {
-        $pdo->prepare("DELETE FROM user_api_keys WHERE user_id = ? AND provider = 'mpesa'")
-            ->execute([$user_id]);
+        // Delete the user's own key for whichever provider they saved
+        $stmt = $pdo->prepare("SELECT provider FROM user_api_keys WHERE user_id = ? AND provider IN ('mpesa','pesaflux','intasend') LIMIT 1");
+        $stmt->execute([$user_id]);
+        $existingKey = $stmt->fetch();
+        $delProvider = $existingKey ? $existingKey['provider'] : 'mpesa';
+        $pdo->prepare("DELETE FROM user_api_keys WHERE user_id = ? AND provider = ?")
+            ->execute([$user_id, $delProvider]);
         // Also disable gateway if it was enabled via own keys
         $pdo->prepare("UPDATE subscriptions SET gateway_enabled=0, updated_at=NOW() WHERE user_id=?")
             ->execute([$user_id]);
-        header("Location: index?success=" . urlencode('Your M-Pesa API keys have been removed.')); exit;
+        header("Location: index?success=" . urlencode('Your API keys have been removed.')); exit;
     }
 
-    // ── Save own M-Pesa API keys (free, no billing) ──────────
+    // ── Save gateway setup ────────────────────────────────────────
+    // pesaflux  → user enters till/paybill details only; you add API keys manually; billed KES 400/mo or 3500/yr
+    // mpesa     → user enters consumer key + secret + passkey + shortcode; FREE
+    // intasend  → user enters public key + secret key + shortcode; FREE
     if ($action === 'save_own_keys') {
-        $consumerKey    = trim($_POST['mpesa_consumer_key']    ?? '');
-        $consumerSecret = trim($_POST['mpesa_consumer_secret'] ?? '');
-        $passkey        = trim($_POST['mpesa_passkey']         ?? '');
-        $shortcode      = trim($_POST['mpesa_shortcode']       ?? '');
-        $gwType         = trim($_POST['gateway_type']          ?? '');
-        $gwBank         = trim($_POST['gateway_bank']          ?? '');
-        $gwAccount      = trim($_POST['gateway_account']       ?? '');
+        $selectedProvider = trim($_POST['own_provider'] ?? '');
+        if (!in_array($selectedProvider, ['mpesa', 'pesaflux', 'intasend'])) {
+            $errorMsg = 'Please select a payment provider.';
 
-        if (empty($consumerKey) || empty($consumerSecret) || empty($passkey) || empty($shortcode)) {
-            $errorMsg = 'All API key fields are required.';
-        } elseif (!in_array($gwType, ['till', 'paybill'])) {
-            $errorMsg = 'Please select Till or Paybill.';
-        } elseif (!preg_match('/^\d{5,8}$/', $shortcode)) {
-            $errorMsg = 'Enter a valid shortcode (5–8 digits).';
-        } elseif ($gwType === 'paybill' && empty($gwBank)) {
-            $errorMsg = 'Please select your bank.';
-        } elseif ($gwType === 'paybill' && empty($gwAccount)) {
-            $errorMsg = 'Please enter the account number.';
-        } else {
-            // Encrypt and upsert keys
-            $encCK = encrypt_key($consumerKey);
-            $encCS = encrypt_key($consumerSecret);
-            $encPK = encrypt_key($passkey);
+        } elseif ($selectedProvider === 'pesaflux') {
+            // ── PesaFlux: user enters ONLY their Till or Paybill details ──
+            // API keys are added by admin manually. User pays gateway fee.
+            $gwType    = trim($_POST['gateway_type']    ?? '');
+            $gwBank    = trim($_POST['gateway_bank']    ?? '');
+            $gwAccount = trim($_POST['gateway_account'] ?? '');
 
-            $pdo->prepare("
-                INSERT INTO user_api_keys
-                    (user_id, provider, consumer_key_encrypted, consumer_secret_encrypted, passkey_encrypted, shortcode, created_at, updated_at)
-                VALUES (?, 'mpesa', ?, ?, ?, ?, NOW(), NOW())
-                ON DUPLICATE KEY UPDATE
-                    consumer_key_encrypted    = VALUES(consumer_key_encrypted),
-                    consumer_secret_encrypted = VALUES(consumer_secret_encrypted),
-                    passkey_encrypted         = VALUES(passkey_encrypted),
-                    shortcode                 = VALUES(shortcode),
-                    updated_at                = NOW()
-            ")->execute([$user_id, $encCK, $encCS, $encPK, $shortcode]);
+            if ($gwType === 'till') {
+                $gwId = trim($_POST['gateway_till'] ?? '');
+                if (!preg_match('/^\d{5,8}$/', $gwId)) { $errorMsg = 'Enter a valid Till number (5–8 digits).'; }
+            } else {
+                $gwType = 'paybill';
+                $gwId   = trim($_POST['gateway_identifier'] ?? '');
+                if (!preg_match('/^\d{5,8}$/', $gwId))  { $errorMsg = 'Enter a valid Paybill number (5–8 digits).'; }
+                elseif (empty($gwBank))                  { $errorMsg = 'Please select your bank.'; }
+                elseif (empty($gwAccount))               { $errorMsg = 'Please enter your account number.'; }
+            }
 
-            // Enable gateway with type/bank/account info, no billing
-            $pdo->prepare("
-                UPDATE subscriptions
-                SET gateway_enabled=1, gateway_type=?, gateway_identifier=?,
-                    gateway_bank=?, gateway_account=?, gateway_plan='own',
-                    gateway_expires_at=NULL, updated_at=NOW()
-                WHERE user_id=?
-            ")->execute([$gwType, $shortcode, $gwBank ?: null, $gwAccount ?: null, $user_id]);
+            if (empty($errorMsg)) {
+                // Upsert a placeholder row so the system knows pesaflux is the provider.
+                // api_key_encrypted is intentionally left NULL — admin fills it later.
+                $pdo->prepare("
+                    INSERT INTO user_api_keys (user_id, provider, shortcode, created_at, updated_at)
+                    VALUES (?, 'pesaflux', ?, NOW(), NOW())
+                    ON DUPLICATE KEY UPDATE shortcode=VALUES(shortcode), updated_at=NOW()
+                ")->execute([$user_id, $gwId]);
 
-            header("Location: index?success=" . urlencode('Your M-Pesa API keys have been saved and gateway activated — no monthly fee applied.')); exit;
+                $gwPlan = trim($_POST['gateway_plan'] ?? 'monthly');
+                if (!in_array($gwPlan, ['monthly', 'yearly'])) $gwPlan = 'monthly';
+                $amount = $gwPlan === 'yearly' ? 3500 : 400;
+
+                $pdo->prepare("
+                    UPDATE subscriptions
+                    SET gateway_type=?, gateway_identifier=?, gateway_bank=?,
+                        gateway_account=?, gateway_plan=?, updated_at=NOW()
+                    WHERE user_id=?
+                ")->execute([$gwType, $gwId, $gwBank ?: null, $gwAccount ?: null, $gwPlan, $user_id]);
+
+                $currentExpiry = $subscription['gateway_expires_at'] ?? null;
+                $base = ($currentExpiry && strtotime($currentExpiry) > time()) ? $currentExpiry : date('Y-m-d H:i:s');
+                $periodStart = date('Y-m-d', strtotime($base));
+                $periodEnd   = $gwPlan === 'yearly'
+                    ? date('Y-m-d', strtotime('+1 year -1 day', strtotime($base)))
+                    : date('Y-m-d', strtotime('+1 month -1 day', strtotime($base)));
+
+                $stmt = $pdo->prepare("
+                    INSERT INTO gateway_invoices (user_id, plan, amount, period_start, period_end, status, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, 'pending', NOW(), NOW())
+                ");
+                $stmt->execute([$user_id, $gwPlan, $amount, $periodStart, $periodEnd]);
+                $gatewayInvoiceId = $pdo->lastInsertId();
+
+                header("Location: index?pay_gateway={$gatewayInvoiceId}&amount={$amount}"); exit;
+            }
+
+        } elseif ($selectedProvider === 'mpesa') {
+            // ── M-Pesa Daraja: user enters their own API keys — FREE ──
+            $consumerKey    = trim($_POST['mpesa_consumer_key']    ?? '');
+            $consumerSecret = trim($_POST['mpesa_consumer_secret'] ?? '');
+            $passkey        = trim($_POST['mpesa_passkey']         ?? '');
+            $shortcode      = trim($_POST['mpesa_shortcode']       ?? '');
+            $gwType         = trim($_POST['gateway_type']          ?? '');
+
+            if (empty($consumerKey) || empty($consumerSecret) || empty($passkey) || empty($shortcode)) {
+                $errorMsg = 'All M-Pesa API key fields are required.';
+            } elseif (!in_array($gwType, ['till', 'paybill'])) {
+                $errorMsg = 'Please select Till or Paybill.';
+            } elseif (!preg_match('/^\d{5,8}$/', $shortcode)) {
+                $errorMsg = 'Enter a valid shortcode (5–8 digits).';
+            } else {
+                $encCK = encrypt_key($consumerKey);
+                $encCS = encrypt_key($consumerSecret);
+                $encPK = encrypt_key($passkey);
+
+                $pdo->prepare("
+                    INSERT INTO user_api_keys
+                        (user_id, provider, consumer_key_encrypted, consumer_secret_encrypted, passkey_encrypted, shortcode, created_at, updated_at)
+                    VALUES (?, 'mpesa', ?, ?, ?, ?, NOW(), NOW())
+                    ON DUPLICATE KEY UPDATE
+                        consumer_key_encrypted    = VALUES(consumer_key_encrypted),
+                        consumer_secret_encrypted = VALUES(consumer_secret_encrypted),
+                        passkey_encrypted         = VALUES(passkey_encrypted),
+                        shortcode                 = VALUES(shortcode),
+                        updated_at                = NOW()
+                ")->execute([$user_id, $encCK, $encCS, $encPK, $shortcode]);
+
+                // M-Pesa: no billing, no expiry, gateway_plan = 'own'
+                $pdo->prepare("
+                    UPDATE subscriptions
+                    SET gateway_enabled=1, gateway_type=?, gateway_identifier=?,
+                        gateway_bank=NULL, gateway_account=NULL, gateway_plan='own',
+                        gateway_expires_at=NULL, updated_at=NOW()
+                    WHERE user_id=?
+                ")->execute([$gwType, $shortcode, $user_id]);
+
+                header("Location: index?success=" . urlencode('M-Pesa API keys saved — gateway activated free of charge.')); exit;
+            }
+
+        } elseif ($selectedProvider === 'intasend') {
+            // ── IntaSend: user enters their own API keys — FREE ──
+            $publicKey = trim($_POST['intasend_public_key'] ?? '');
+            $secretKey = trim($_POST['intasend_secret_key'] ?? '');
+            $shortcode = trim($_POST['mpesa_shortcode']     ?? '');
+            $gwType    = trim($_POST['gateway_type']        ?? '');
+
+            if (empty($publicKey) || empty($secretKey)) {
+                $errorMsg = 'IntaSend public key and secret key are required.';
+            } elseif (empty($shortcode) || !preg_match('/^\d{5,8}$/', $shortcode)) {
+                $errorMsg = 'Enter a valid shortcode (5–8 digits).';
+            } elseif (!in_array($gwType, ['till', 'paybill'])) {
+                $errorMsg = 'Please select Till or Paybill.';
+            } else {
+                $encPub = encrypt_key($publicKey);
+                $encSec = encrypt_key($secretKey);
+
+                $pdo->prepare("
+                    INSERT INTO user_api_keys
+                        (user_id, provider, public_key_encrypted, secret_key_encrypted, shortcode, created_at, updated_at)
+                    VALUES (?, 'intasend', ?, ?, ?, NOW(), NOW())
+                    ON DUPLICATE KEY UPDATE
+                        public_key_encrypted = VALUES(public_key_encrypted),
+                        secret_key_encrypted = VALUES(secret_key_encrypted),
+                        shortcode            = VALUES(shortcode),
+                        updated_at           = NOW()
+                ")->execute([$user_id, $encPub, $encSec, $shortcode]);
+
+                // IntaSend: no billing, no expiry, gateway_plan = 'own'
+                $pdo->prepare("
+                    UPDATE subscriptions
+                    SET gateway_enabled=1, gateway_type=?, gateway_identifier=?,
+                        gateway_bank=NULL, gateway_account=NULL, gateway_plan='own',
+                        gateway_expires_at=NULL, updated_at=NOW()
+                    WHERE user_id=?
+                ")->execute([$gwType, $shortcode, $user_id]);
+
+                header("Location: index?success=" . urlencode('IntaSend API keys saved — gateway activated free of charge.')); exit;
+            }
         }
     }
 
@@ -551,7 +657,7 @@ $keBanks = [
                                 <!-- =====================
                                      GATEWAY BILLING HISTORY (only shown if on paid gateway plan)
                                      ===================== -->
-                                <?php if (!empty($gatewayInvoices) && !$hasOwnKeys): ?>
+                                <?php if (!empty($gatewayInvoices) && !($hasOwnKeys && $ownKeysFree)): ?>
                                 <div class="card card-raised shadow-sm mb-4">
                                     <div class="card-header bg-primary text-white">
                                         <i class="fa fa-mobile me-2"></i>Gateway Billing History
@@ -605,7 +711,11 @@ $keBanks = [
                                      ===================== -->
                                 <div class="card card-raised shadow-sm mb-4">
                                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                                        <span><i class="fa fa-mobile me-2"></i>M-Pesa Payment Gateway</span>
+                                        <span><i class="fa fa-mobile me-2"></i>Payment Gateway
+                                            <?php if ($hasOwnKeys): ?>
+                                                <small class="ms-1 opacity-75">(<?= ucfirst($ownProvider) ?>)</small>
+                                            <?php endif; ?>
+                                        </span>
                                         <?php if ($gatewayActive && $hasOwnKeys): ?>
                                             <span class="badge bg-success">Active <i class="fa fa-key ms-1"></i></span>
                                         <?php elseif ($gatewayActive): ?>
@@ -626,8 +736,8 @@ $keBanks = [
                                                         <i class="fa fa-check-circle me-1"></i>Gateway Active
                                                     </span>
                                                     <?php if ($hasOwnKeys): ?>
-                                                        <span class="badge bg-success">
-                                                            <i class="fa fa-key me-1"></i>Own API Keys · Free
+                                                        <span class="badge bg-<?= $ownKeysFree ? 'success' : ($gatewayPlan==='yearly' ? 'primary' : 'secondary') ?>">
+                                                            <i class="fa fa-key me-1"></i><?= ucfirst($ownProvider) ?> Keys<?= $ownKeysFree ? ' · Free' : '' ?>
                                                         </span>
                                                     <?php else: ?>
                                                         <span class="badge bg-<?= $gatewayPlan==='yearly' ? 'primary' : 'secondary' ?>">
@@ -650,14 +760,14 @@ $keBanks = [
                                                     <i class="fa fa-hashtag me-1"></i>Account: <strong class="font-monospace"><?= htmlspecialchars($subscription['gateway_account']) ?></strong>
                                                 </div>
                                                 <?php endif; ?>
-                                                <?php if (!$hasOwnKeys && $gatewayExpiresAt): ?>
+                                                <?php if (!($hasOwnKeys && $ownKeysFree) && $gatewayExpiresAt): ?>
                                                 <div class="small text-muted">
                                                     <i class="fa fa-calendar me-1"></i>Renews: <strong><?= date('M d, Y', strtotime($gatewayExpiresAt)) ?></strong>
                                                     <?php if ($gatewayDaysLeft <= 7): ?>
                                                         <span class="text-danger ms-1"><i class="fa fa-exclamation-triangle"></i> <?= $gatewayDaysLeft ?> day(s) left</span>
                                                     <?php endif; ?>
                                                 </div>
-                                                <?php elseif ($hasOwnKeys): ?>
+                                                <?php elseif ($hasOwnKeys && $ownKeysFree): ?>
                                                 <div class="small text-success mt-1">
                                                     <i class="fa fa-infinity me-1"></i>No expiry — using your own API keys
                                                 </div>
@@ -668,7 +778,7 @@ $keBanks = [
                                                     <i class="fa fa-flask me-1"></i>Test Gateway
                                                 </button>
                                                 <button class="btn btn-outline-primary btn-sm" onclick="document.getElementById('gatewaySetupForm').classList.toggle('d-none')">
-                                                    <i class="fa fa-pencil me-1"></i>Change <?= $hasOwnKeys ? 'API Keys' : 'Plan / Details' ?>
+                                                    <i class="fa fa-pencil me-1"></i>Change <?= $hasOwnKeys ? ucfirst($ownProvider) . ' Keys' : 'Plan / Details' ?>
                                                 </button>
                                                 <form method="POST" onsubmit="return confirm('Disable the M-Pesa gateway?')">
                                                     <input type="hidden" name="action" value="<?= $hasOwnKeys ? 'delete_own_keys' : 'disable_gateway' ?>">
@@ -693,96 +803,93 @@ $keBanks = [
                                         <!-- ── SETUP FORM (shown for inactive/expired, or toggled when active) ── -->
                                         <div id="gatewaySetupForm" class="<?= ($gatewayActive && !$gatewayExpired) ? 'd-none' : '' ?> mt-2">
 
-                                            <!-- KEY SOURCE TOGGLE -->
+                                            <!-- PROVIDER SELECTOR -->
                                             <div class="mb-3">
-                                                <label class="form-label fw-bold small">M-Pesa API Keys</label>
-                                                <div class="d-flex gap-2 mb-2">
-                                                    <div class="flex-fill">
-                                                        <input type="radio" class="btn-check" name="key_source_toggle" id="ks_own" value="own"
-                                                            <?= $hasOwnKeys ? 'checked' : '' ?>>
-                                                        <label class="btn btn-outline-success w-100 text-start px-3" for="ks_own">
-                                                            <i class="fa fa-key me-1"></i><strong>Own Keys</strong><br>
-                                                            <small class="fw-normal text-muted">Free — no monthly fee</small>
+                                                <label class="form-label fw-bold small">Payment Provider</label>
+                                                <div class="row g-2 mb-1">
+                                                    <div class="col-4">
+                                                        <input type="radio" class="btn-check" name="key_source_toggle" id="ks_pesaflux" value="pesaflux"
+                                                            <?= ($ownProvider === 'pesaflux' || (!$hasOwnKeys)) ? 'checked' : '' ?>>
+                                                        <label class="btn btn-outline-warning w-100 text-start px-2 py-2" for="ks_pesaflux">
+                                                            <i class="fa fa-cloud me-1"></i><strong>PesaFlux</strong><br>
+                                                            <small class="fw-normal text-muted d-block" style="font-size:.7rem">Platform · KES 400/mo</small>
                                                         </label>
                                                     </div>
-                                                    <div class="flex-fill">
-                                                        <input type="radio" class="btn-check" name="key_source_toggle" id="ks_platform" value="platform"
-                                                            <?= (!$hasOwnKeys) ? 'checked' : '' ?>>
-                                                        <label class="btn btn-outline-secondary w-100 text-start px-3" for="ks_platform">
-                                                            <i class="fa fa-cloud me-1"></i><strong>Platform</strong><br>
-                                                            <small class="fw-normal text-muted">KES 400/mo · KES 3,500/yr</small>
+                                                    <div class="col-4">
+                                                        <input type="radio" class="btn-check" name="key_source_toggle" id="ks_mpesa" value="mpesa"
+                                                            <?= ($ownProvider === 'mpesa') ? 'checked' : '' ?>>
+                                                        <label class="btn btn-outline-success w-100 text-start px-2 py-2" for="ks_mpesa">
+                                                            <i class="fa fa-key me-1"></i><strong>M-Pesa</strong><br>
+                                                            <small class="fw-normal text-muted d-block" style="font-size:.7rem">Own keys · Free</small>
+                                                        </label>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <input type="radio" class="btn-check" name="key_source_toggle" id="ks_intasend" value="intasend"
+                                                            <?= ($ownProvider === 'intasend') ? 'checked' : '' ?>>
+                                                        <label class="btn btn-outline-info w-100 text-start px-2 py-2" for="ks_intasend">
+                                                            <i class="fa fa-key me-1"></i><strong>IntaSend</strong><br>
+                                                            <small class="fw-normal text-muted d-block" style="font-size:.7rem">Own keys · Free</small>
                                                         </label>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             <!-- ─────────────────────────────────
-                                                 SECTION A: OWN API KEYS FORM
+                                                 PESAFLUX: till/paybill details only — no API keys from user
                                                  ───────────────────────────────── -->
-                                            <div id="ownKeysSection" class="<?= !$hasOwnKeys ? 'd-none' : '' ?>">
-                                                <div class="alert alert-success py-2 mb-3 small">
-                                                    <i class="fa fa-shield me-1"></i>
-                                                    Your keys are encrypted with AES-256 before storage. We never store them in plain text.
+                                            <div id="section_pesaflux" class="<?= ($ownProvider !== 'pesaflux' && $hasOwnKeys) ? 'd-none' : '' ?>">
+                                                <div class="alert alert-warning py-2 mb-3 small">
+                                                    <i class="fa fa-info-circle me-1"></i>
+                                                    We'll set up the gateway on our end. Just enter your M-Pesa details below and choose a billing plan.
                                                 </div>
                                                 <form method="POST">
                                                     <input type="hidden" name="action" value="save_own_keys">
+                                                    <input type="hidden" name="own_provider" value="pesaflux">
 
-                                                    <div class="mb-3">
-                                                        <label class="form-label fw-bold small">Consumer Key</label>
-                                                        <input type="text" class="form-control font-monospace" name="mpesa_consumer_key"
-                                                            placeholder="Safaricom consumer key" required autocomplete="off">
-                                                    </div>
-                                                    <div class="mb-3">
-                                                        <label class="form-label fw-bold small">Consumer Secret</label>
-                                                        <div class="input-group">
-                                                            <input type="password" class="form-control font-monospace" name="mpesa_consumer_secret"
-                                                                id="consumerSecretInput" placeholder="Safaricom consumer secret" required autocomplete="off">
-                                                            <button class="btn btn-outline-secondary" type="button" onclick="toggleVisibility('consumerSecretInput', this)">
-                                                                <i class="fa fa-eye"></i>
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                    <div class="mb-3">
-                                                        <label class="form-label fw-bold small">Passkey</label>
-                                                        <div class="input-group">
-                                                            <input type="password" class="form-control font-monospace" name="mpesa_passkey"
-                                                                id="passkeyInput" placeholder="Lipa Na M-Pesa passkey" required autocomplete="off">
-                                                            <button class="btn btn-outline-secondary" type="button" onclick="toggleVisibility('passkeyInput', this)">
-                                                                <i class="fa fa-eye"></i>
-                                                            </button>
-                                                        </div>
-                                                    </div>
-
-                                                    <!-- Shared type/shortcode fields -->
                                                     <div class="mb-3">
                                                         <label class="form-label fw-bold small">Account Type</label>
                                                         <div class="d-flex gap-2">
                                                             <div class="flex-fill">
-                                                                <input type="radio" class="btn-check" name="gateway_type" id="own_type_till" value="till"
+                                                                <input type="radio" class="btn-check" name="gateway_type" id="pf_type_till" value="till"
                                                                     <?= ($gatewayType !== 'paybill') ? 'checked' : '' ?>>
-                                                                <label class="btn btn-outline-secondary w-100" for="own_type_till">
+                                                                <label class="btn btn-outline-secondary w-100" for="pf_type_till">
                                                                     <i class="fa fa-store me-1"></i>Till
                                                                 </label>
                                                             </div>
                                                             <div class="flex-fill">
-                                                                <input type="radio" class="btn-check" name="gateway_type" id="own_type_paybill" value="paybill"
+                                                                <input type="radio" class="btn-check" name="gateway_type" id="pf_type_paybill" value="paybill"
                                                                     <?= $gatewayType === 'paybill' ? 'checked' : '' ?>>
-                                                                <label class="btn btn-outline-secondary w-100" for="own_type_paybill">
+                                                                <label class="btn btn-outline-secondary w-100" for="pf_type_paybill">
                                                                     <i class="fa fa-university me-1"></i>Paybill
                                                                 </label>
                                                             </div>
                                                         </div>
                                                     </div>
 
-                                                    <div class="mb-3">
-                                                        <label class="form-label fw-bold small">Shortcode (Till / Paybill Number)</label>
-                                                        <input type="text" class="form-control" name="mpesa_shortcode"
-                                                            value="<?= htmlspecialchars($gatewayId ?? '') ?>"
-                                                            placeholder="e.g. 174379" pattern="\d{5,8}" required>
+                                                    <!-- Till fields -->
+                                                    <div id="pf_till_fields" class="<?= $gatewayType === 'paybill' ? 'd-none' : '' ?>">
+                                                        <div class="mb-3">
+                                                            <label class="form-label fw-bold small">Till Number</label>
+                                                            <input type="text" class="form-control" name="gateway_till"
+                                                                value="<?= $gatewayType !== 'paybill' ? htmlspecialchars($gatewayId ?? '') : '' ?>"
+                                                                placeholder="e.g. 123456" pattern="\d{5,8}">
+                                                        </div>
                                                     </div>
 
-                                                    <!-- Own-keys paybill extras -->
-                                                    <div id="ownPaybillExtras" class="<?= $gatewayType === 'paybill' ? '' : 'd-none' ?>">
+                                                    <!-- Paybill fields -->
+                                                    <div id="pf_paybill_fields" class="<?= $gatewayType === 'paybill' ? '' : 'd-none' ?>">
+                                                        <div class="mb-3">
+                                                            <label class="form-label fw-bold small">Business / Paybill Number</label>
+                                                            <input type="text" class="form-control" name="gateway_identifier"
+                                                                value="<?= $gatewayType === 'paybill' ? htmlspecialchars($gatewayId ?? '') : '' ?>"
+                                                                placeholder="e.g. 522522" pattern="\d{5,8}">
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label fw-bold small">Account Number</label>
+                                                            <input type="text" class="form-control" name="gateway_account"
+                                                                value="<?= htmlspecialchars($subscription['gateway_account'] ?? '') ?>"
+                                                                placeholder="e.g. 0012345678">
+                                                        </div>
                                                         <div class="mb-3">
                                                             <label class="form-label fw-bold small">Bank</label>
                                                             <select class="form-select" name="gateway_bank">
@@ -794,16 +901,164 @@ $keBanks = [
                                                                 <?php endforeach; ?>
                                                             </select>
                                                         </div>
-                                                        <div class="mb-3">
-                                                            <label class="form-label fw-bold small">Account Number</label>
-                                                            <input type="text" class="form-control" name="gateway_account"
-                                                                value="<?= htmlspecialchars($subscription['gateway_account'] ?? '') ?>"
-                                                                placeholder="e.g. 0012345678">
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small">Billing Plan</label>
+                                                        <div class="d-flex gap-2">
+                                                            <div class="flex-fill">
+                                                                <input type="radio" class="btn-check" name="gateway_plan" id="pf_plan_monthly" value="monthly"
+                                                                    <?= ($gatewayPlan !== 'yearly') ? 'checked' : '' ?>>
+                                                                <label class="btn btn-outline-secondary w-100" for="pf_plan_monthly">
+                                                                    Monthly<br><strong>KES 400</strong>
+                                                                </label>
+                                                            </div>
+                                                            <div class="flex-fill">
+                                                                <input type="radio" class="btn-check" name="gateway_plan" id="pf_plan_yearly" value="yearly"
+                                                                    <?= $gatewayPlan === 'yearly' ? 'checked' : '' ?>>
+                                                                <label class="btn btn-outline-success w-100" for="pf_plan_yearly">
+                                                                    Yearly<br><strong>KES 3,500</strong>
+                                                                </label>
+                                                            </div>
                                                         </div>
                                                     </div>
 
+                                                    <button type="submit" class="btn btn-warning w-100 text-dark">
+                                                        <i class="fa fa-mobile me-2"></i>
+                                                        <?= ($gatewayActive && $ownProvider === 'pesaflux') ? 'Update & Pay' : 'Activate via PesaFlux' ?>
+                                                    </button>
+                                                </form>
+                                            </div>
+
+                                            <!-- ─────────────────────────────────
+                                                 M-PESA: user's own Daraja API keys — FREE
+                                                 ───────────────────────────────── -->
+                                            <div id="section_mpesa" class="<?= ($ownProvider !== 'mpesa') ? 'd-none' : '' ?>">
+                                                <div class="alert alert-success py-2 mb-3 small">
+                                                    <i class="fa fa-shield me-1"></i>
+                                                    Your keys are encrypted with AES-256. No gateway fee — you own these keys.
+                                                </div>
+                                                <form method="POST">
+                                                    <input type="hidden" name="action" value="save_own_keys">
+                                                    <input type="hidden" name="own_provider" value="mpesa">
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small">Consumer Key</label>
+                                                        <input type="text" class="form-control font-monospace" name="mpesa_consumer_key"
+                                                            placeholder="Safaricom consumer key" autocomplete="off">
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small">Consumer Secret</label>
+                                                        <div class="input-group">
+                                                            <input type="password" class="form-control font-monospace" name="mpesa_consumer_secret"
+                                                                id="consumerSecretInput" placeholder="Safaricom consumer secret" autocomplete="off">
+                                                            <button class="btn btn-outline-secondary" type="button" onclick="toggleVisibility('consumerSecretInput', this)">
+                                                                <i class="fa fa-eye"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small">Passkey</label>
+                                                        <div class="input-group">
+                                                            <input type="password" class="form-control font-monospace" name="mpesa_passkey"
+                                                                id="passkeyInput" placeholder="Lipa Na M-Pesa passkey" autocomplete="off">
+                                                            <button class="btn btn-outline-secondary" type="button" onclick="toggleVisibility('passkeyInput', this)">
+                                                                <i class="fa fa-eye"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small">Account Type</label>
+                                                        <div class="d-flex gap-2">
+                                                            <div class="flex-fill">
+                                                                <input type="radio" class="btn-check" name="gateway_type" id="mp_type_till" value="till"
+                                                                    <?= ($gatewayType !== 'paybill') ? 'checked' : '' ?>>
+                                                                <label class="btn btn-outline-secondary w-100" for="mp_type_till">
+                                                                    <i class="fa fa-store me-1"></i>Till
+                                                                </label>
+                                                            </div>
+                                                            <div class="flex-fill">
+                                                                <input type="radio" class="btn-check" name="gateway_type" id="mp_type_paybill" value="paybill"
+                                                                    <?= $gatewayType === 'paybill' ? 'checked' : '' ?>>
+                                                                <label class="btn btn-outline-secondary w-100" for="mp_type_paybill">
+                                                                    <i class="fa fa-university me-1"></i>Paybill
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small">Shortcode <span class="text-muted fw-normal">(Till or Paybill number)</span></label>
+                                                        <input type="text" class="form-control" name="mpesa_shortcode"
+                                                            value="<?= ($ownProvider === 'mpesa') ? htmlspecialchars($gatewayId ?? '') : '' ?>"
+                                                            placeholder="e.g. 174379" pattern="\d{5,8}">
+                                                        <div class="form-text">For both Till and Paybill — just enter the number directly.</div>
+                                                    </div>
+
                                                     <button type="submit" class="btn btn-success w-100">
-                                                        <i class="fa fa-lock me-2"></i>Encrypt &amp; Save API Keys — Free
+                                                        <i class="fa fa-lock me-2"></i>Save M-Pesa Keys — Free
+                                                    </button>
+                                                </form>
+                                            </div>
+
+                                            <!-- ─────────────────────────────────
+                                                 INTASEND: user's own keys — FREE
+                                                 ───────────────────────────────── -->
+                                            <div id="section_intasend" class="<?= ($ownProvider !== 'intasend') ? 'd-none' : '' ?>">
+                                                <div class="alert alert-info py-2 mb-3 small">
+                                                    <i class="fa fa-info-circle me-1"></i>
+                                                    Get your API keys from
+                                                    <a href="https://intasend.com" target="_blank" class="alert-link">intasend.com</a>
+                                                    → Dashboard → API Keys. No gateway fee — you own these keys.
+                                                </div>
+                                                <form method="POST">
+                                                    <input type="hidden" name="action" value="save_own_keys">
+                                                    <input type="hidden" name="own_provider" value="intasend">
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small">Public Key</label>
+                                                        <input type="text" class="form-control font-monospace" name="intasend_public_key"
+                                                            placeholder="ISPubKey_live_..." autocomplete="off">
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small">Secret Key</label>
+                                                        <div class="input-group">
+                                                            <input type="password" class="form-control font-monospace" name="intasend_secret_key"
+                                                                id="intasendSecretKey" placeholder="ISSecretKey_live_..." autocomplete="off">
+                                                            <button class="btn btn-outline-secondary" type="button" onclick="toggleVisibility('intasendSecretKey', this)">
+                                                                <i class="fa fa-eye"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small">Account Type</label>
+                                                        <div class="d-flex gap-2">
+                                                            <div class="flex-fill">
+                                                                <input type="radio" class="btn-check" name="gateway_type" id="is_type_till" value="till"
+                                                                    <?= ($gatewayType !== 'paybill') ? 'checked' : '' ?>>
+                                                                <label class="btn btn-outline-secondary w-100" for="is_type_till">
+                                                                    <i class="fa fa-store me-1"></i>Till
+                                                                </label>
+                                                            </div>
+                                                            <div class="flex-fill">
+                                                                <input type="radio" class="btn-check" name="gateway_type" id="is_type_paybill" value="paybill"
+                                                                    <?= $gatewayType === 'paybill' ? 'checked' : '' ?>>
+                                                                <label class="btn btn-outline-secondary w-100" for="is_type_paybill">
+                                                                    <i class="fa fa-university me-1"></i>Paybill
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small">Shortcode <span class="text-muted fw-normal">(Till or Paybill number)</span></label>
+                                                        <input type="text" class="form-control" name="mpesa_shortcode"
+                                                            value="<?= ($ownProvider === 'intasend') ? htmlspecialchars($gatewayId ?? '') : '' ?>"
+                                                            placeholder="e.g. 123456" pattern="\d{5,8}">
+                                                    </div>
+
+                                                    <button type="submit" class="btn btn-info w-100 text-white">
+                                                        <i class="fa fa-lock me-2"></i>Save IntaSend Keys — Free
                                                     </button>
                                                 </form>
                                             </div>
@@ -939,9 +1194,11 @@ $keBanks = [
                                         </div>
                                         <?php if ($gatewayActive): ?>
                                         <div class="d-flex justify-content-between py-2 border-bottom">
-                                            <span class="text-muted">M-Pesa Gateway</span>
-                                            <?php if ($hasOwnKeys): ?>
-                                                <strong class="text-success"><i class="fa fa-key me-1"></i>Free (own keys)</strong>
+                                            <span class="text-muted">Payment Gateway</span>
+                                            <?php if ($hasOwnKeys && $ownKeysFree): ?>
+                                                <strong class="text-success"><i class="fa fa-key me-1"></i>Free (M-Pesa own keys)</strong>
+                                            <?php elseif ($hasOwnKeys): ?>
+                                                <strong>KES <?= $gatewayPlan === 'yearly' ? '3,500' : '400' ?> <span class="text-muted small"><?= ucfirst($ownProvider) ?> keys</span></strong>
                                             <?php else: ?>
                                                 <strong>KES <?= $gatewayPlan === 'yearly' ? '3,500' : '400' ?> <span class="text-muted small">separate</span></strong>
                                             <?php endif; ?>
@@ -953,7 +1210,7 @@ $keBanks = [
                                         </div>
                                         <div class="small text-muted mt-2">
                                             <i class="fa fa-info-circle me-1"></i>
-                                            Platform fee invoiced on your billing anniversary. Gateway billed separately<?= $hasOwnKeys ? ' — waived for own API keys' : '' ?>.
+                                            Platform fee invoiced on your billing anniversary. Gateway billed separately<?= ($hasOwnKeys && $ownKeysFree) ? ' — waived for M-Pesa own API keys' : ($hasOwnKeys ? ' — ' . ucfirst($ownProvider) . ' keys attract the gateway fee' : '') ?>.
                                         </div>
                                     </div>
                                 </div>
@@ -1207,41 +1464,34 @@ $keBanks = [
         btn.innerHTML = isPassword ? '<i class="fa fa-eye-slash"></i>' : '<i class="fa fa-eye"></i>';
     }
 
-    // ── Key source toggle (Own Keys vs Platform) ───────────────
+    // Provider selector toggle
     function toggleKeySource() {
-        const selected = document.querySelector('input[name="key_source_toggle"]:checked');
-        const isOwn = selected && selected.value === 'own';
-        const ownSection      = document.getElementById('ownKeysSection');
-        const platformSection = document.getElementById('platformSection');
-        if (ownSection)      ownSection.classList.toggle('d-none', !isOwn);
-        if (platformSection) platformSection.classList.toggle('d-none', isOwn);
+        const sel = document.querySelector('input[name="key_source_toggle"]:checked');
+        const val = sel ? sel.value : 'pesaflux';
+        ['pesaflux','mpesa','intasend'].forEach(function(p) {
+            var el = document.getElementById('section_' + p);
+            if (el) el.classList.toggle('d-none', val !== p);
+        });
     }
-    document.querySelectorAll('input[name="key_source_toggle"]').forEach(r =>
-        r.addEventListener('change', toggleKeySource)
-    );
+    document.querySelectorAll('input[name="key_source_toggle"]').forEach(function(r) {
+        r.addEventListener('change', toggleKeySource);
+    });
     toggleKeySource();
 
-    // ── Till / Paybill field toggle (platform form) ───────────
-    function toggleGatewayFields() {
-        const selected = document.querySelector('input[name="gateway_type"]:checked');
-        const isPaybill = selected && selected.value === 'paybill';
-        const tf = document.getElementById('tillFields');
-        const pf = document.getElementById('paybillFields');
+    // PesaFlux till / paybill toggle
+    function togglePfFields() {
+        var sel = document.querySelector('input[id^="pf_type_"]:checked');
+        var isPaybill = sel && sel.value === 'paybill';
+        var tf = document.getElementById('pf_till_fields');
+        var pf = document.getElementById('pf_paybill_fields');
         if (tf) tf.classList.toggle('d-none', isPaybill);
         if (pf) pf.classList.toggle('d-none', !isPaybill);
-        const tillInput    = document.getElementById('tillInput');
-        const paybillInput = document.getElementById('paybillInput');
-        if (tillInput)    tillInput.required    = !isPaybill;
-        if (paybillInput) paybillInput.required = isPaybill;
-
-        // Also toggle own-keys paybill extras
-        const ownExtras = document.getElementById('ownPaybillExtras');
-        if (ownExtras) ownExtras.classList.toggle('d-none', !isPaybill);
     }
-    document.querySelectorAll('input[name="gateway_type"]').forEach(r =>
-        r.addEventListener('change', toggleGatewayFields)
-    );
-    toggleGatewayFields();
+    document.querySelectorAll('input[id^="pf_type_"]').forEach(function(r) {
+        r.addEventListener('change', togglePfFields);
+    });
+    togglePfFields();
+
 
     // ── Pay modal shared state ─────────────────────────────────
     let currentInvoiceId   = null;
