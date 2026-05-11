@@ -44,5 +44,5 @@ $stmt->execute([
     $user_id
 ]);
 
-header("Location: index.php");
+header("Location: index.php?success=1");
 exit;

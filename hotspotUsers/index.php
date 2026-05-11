@@ -11,7 +11,6 @@ if (!is_logged_in()) {
 }
 check_subscription_gate($pdo, $user_id);
 
-
 /* Load users (hotspot + pppoe) */
 $stmt = $pdo->prepare("
     SELECT hu.*, r.name AS router_name, hp.profile_name AS plan_name
@@ -20,13 +19,18 @@ $stmt = $pdo->prepare("
     JOIN user_router_access ur ON ur.router_id = hu.router_id
     LEFT JOIN hotspot_profiles hp ON hp.id = hu.plan_id
     WHERE ur.user_id = ?
-    ORDER BY hu.user_type, hu.username
+    ORDER BY
+        CASE
+            WHEN hu.user_type = 'hotspot' AND hu.status = 'active' AND hu.expires_at > NOW() THEN 0
+            WHEN hu.user_type = 'pppoe'   AND hu.status = 'active' AND hu.expires_at > NOW() THEN 1
+            ELSE 2
+        END,
+        hu.username
 ");
-
 $stmt->execute([$user_id]);
 $users = $stmt->fetchAll();
 
-/* Load live users */
+/* Live users from routers */
 $liveHotspot = [];
 $livePPPoE   = [];
 
@@ -39,28 +43,21 @@ $stmt = $pdo->prepare("
     WHERE ur.user_id = ?
     AND r.status = 'active'
 ");
-
 $stmt->execute([$user_id]);
 $routers = $stmt->fetchAll();
-
-
 
 foreach ($routers as $router) {
     try {
         $client = router_connect($router['router_id']);
         if (!$client) continue;
 
-        /* Hotspot active */
         foreach ($client->query('/ip/hotspot/active/print')->read() as $a) {
             $liveHotspot[$a['user']] = true;
         }
-
-        /* PPPoE active */
         foreach ($client->query('/ppp/active/print')->read() as $p) {
             $livePPPoE[$p['name']] = true;
         }
-    } catch (Exception $e) {
-    }
+    } catch (Exception $e) {}
 }
 
 /* Load plans for modal */
@@ -71,16 +68,15 @@ $stmt = $pdo->prepare("
     WHERE ur.user_id = ?
     AND hp.plan_type = 'pppoe'
 ");
-
 $stmt->execute([$user_id]);
 $plans = $stmt->fetchAll();
 $router_id = $routers[0]['router_id'] ?? null;
 
-/* Calculate stats */
-$totalUsers = count($users);
-$onlineUsers = 0;
-$activeUsers = 0;
-$pppoeCount = 0;
+/* Stats */
+$totalUsers   = count($users);
+$onlineUsers  = 0;
+$activeUsers  = 0;
+$pppoeCount   = 0;
 $hotspotCount = 0;
 
 foreach ($users as $u) {
@@ -93,6 +89,10 @@ foreach ($users as $u) {
         : isset($liveHotspot[$u['username']]);
     if ($online) $onlineUsers++;
 }
+
+/* Flash message */
+$flash = $_GET['success'] ?? '';
+$flashUser = htmlspecialchars($_GET['user'] ?? '');
 ?>
 
 <body class="nav-fixed bg-light">
@@ -104,7 +104,7 @@ foreach ($users as $u) {
         <div id="layoutDrawer_content">
             <main>
 
-                <!-- Enhanced Header -->
+                <!-- Header -->
                 <header class="bg-primary">
                     <div class="container-xl px-1">
                         <div class="d-flex justify-content-between align-items-center py-3">
@@ -130,7 +130,28 @@ foreach ($users as $u) {
 
                 <div class="container-xl px-1 mt-4">
 
-                    <!-- Stats Cards Row -->
+                    <!-- Flash alerts -->
+                    <?php if ($flash === 'extended' && $flashUser): ?>
+                        <div class="alert alert-success alert-dismissible fade show d-flex align-items-center gap-2 mb-4" role="alert">
+                            <i class="fa fa-clock text-success"></i>
+                            <div>Access time for <strong><?= $flashUser ?></strong> has been extended successfully.</div>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    <?php elseif ($flash === 'deleted' && $flashUser): ?>
+                        <div class="alert alert-warning alert-dismissible fade show d-flex align-items-center gap-2 mb-4" role="alert">
+                            <i class="fa fa-trash text-warning"></i>
+                            <div>User <strong><?= $flashUser ?></strong> has been deleted.</div>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    <?php elseif ($flash === 'updated'): ?>
+                        <div class="alert alert-info alert-dismissible fade show d-flex align-items-center gap-2 mb-4" role="alert">
+                            <i class="fa fa-check-circle text-info"></i>
+                            <div>User updated successfully.</div>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    <?php endif; ?>
+
+                    <!-- Stats Cards -->
                     <div class="row mb-4">
                         <div class="col-xl-3 col-md-6 mb-4">
                             <div class="card card-raised border-start border-primary border-4">
@@ -197,26 +218,16 @@ foreach ($users as $u) {
                         </div>
                     </div>
 
-                    <!-- Tabs for different user types -->
+                    <!-- Users Table -->
                     <div class="card card-raised shadow-sm">
                         <div class="card-header bg-primary text-white">
                             <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <i class="fa fa-list me-2"></i>User Management
-                                </div>
+                                <div><i class="fa fa-list me-2"></i>User Management</div>
                                 <div class="btn-group btn-group-sm">
-                                    <button class="btn btn-light btn-sm active" data-filter="all">
-                                        All Users
-                                    </button>
-                                    <button class="btn btn-light btn-sm" data-filter="pppoe">
-                                        PPPoE
-                                    </button>
-                                    <button class="btn btn-light btn-sm" data-filter="hotspot">
-                                        Hotspot
-                                    </button>
-                                    <button class="btn btn-light btn-sm" data-filter="captive">
-                                        Captive Portal
-                                    </button>
+                                    <button class="btn btn-light btn-sm active" data-filter="all">All Users</button>
+                                    <button class="btn btn-light btn-sm" data-filter="pppoe">PPPoE</button>
+                                    <button class="btn btn-light btn-sm" data-filter="hotspot">Hotspot</button>
+                                    <button class="btn btn-light btn-sm" data-filter="captive">Captive Portal</button>
                                 </div>
                             </div>
                         </div>
@@ -240,41 +251,50 @@ foreach ($users as $u) {
                                     </thead>
                                     <tbody>
 
-                                        <!-- DB USERS (HOTSPOT + PPPOE) -->
                                         <?php foreach ($users as $u):
-                                            $online = $u['user_type'] === 'pppoe'
+                                            $online    = $u['user_type'] === 'pppoe'
                                                 ? isset($livePPPoE[$u['username']])
                                                 : isset($liveHotspot[$u['username']]);
-
                                             $isExpired = strtotime($u['expires_at']) < time();
+                                            $isPppoe   = $u['user_type'] === 'pppoe';
                                         ?>
                                             <tr data-type="<?= $u['user_type'] ?>">
+
+                                                <!-- Username -->
                                                 <td>
                                                     <div class="d-flex align-items-center">
                                                         <div class="avatar avatar-sm me-2">
-                                                            <div class="avatar-title bg-<?= $u['user_type'] == 'pppoe' ? 'info' : 'secondary' ?>-soft text-<?= $u['user_type'] == 'pppoe' ? 'info' : 'secondary' ?> rounded-circle">
-                                                                <i class="fa fa-<?= $u['user_type'] == 'pppoe' ? 'network-wired' : 'rss' ?>"></i>
+                                                            <div class="avatar-title bg-<?= $isPppoe ? 'info' : 'secondary' ?>-soft text-<?= $isPppoe ? 'info' : 'secondary' ?> rounded-circle">
+                                                                <i class="fa fa-<?= $isPppoe ? 'network-wired' : 'rss' ?>"></i>
                                                             </div>
                                                         </div>
                                                         <div>
                                                             <strong><?= htmlspecialchars($u['username']) ?></strong>
                                                             <?php if ($online): ?>
-                                                                <i class="fa fa-circle text-success ms-1" style="font-size: 0.5rem;" title="Online"></i>
+                                                                <i class="fa fa-circle text-success ms-1" style="font-size:0.5rem;" title="Online"></i>
                                                             <?php endif; ?>
                                                         </div>
                                                     </div>
                                                 </td>
+
+                                                <!-- Type -->
                                                 <td>
-                                                    <span class="badge bg-<?= $u['user_type'] == 'pppoe' ? 'info' : 'secondary' ?>-soft text-<?= $u['user_type'] == 'pppoe' ? 'info' : 'secondary' ?>">
+                                                    <span class="badge bg-<?= $isPppoe ? 'info' : 'secondary' ?>-soft text-<?= $isPppoe ? 'info' : 'secondary' ?>">
                                                         <?= strtoupper($u['user_type']) ?>
                                                     </span>
                                                 </td>
+
+                                                <!-- Router -->
                                                 <td>
                                                     <span class="badge bg-primary-soft text-primary">
-                                                        <?= $u['router_name'] ?>
+                                                        <?= htmlspecialchars($u['router_name']) ?>
                                                     </span>
                                                 </td>
+
+                                                <!-- Plan -->
                                                 <td><?= $u['plan_name'] ?? '<span class="text-muted">No plan</span>' ?></td>
+
+                                                <!-- Online -->
                                                 <td>
                                                     <?php if ($online): ?>
                                                         <span class="badge bg-success">
@@ -286,6 +306,8 @@ foreach ($users as $u) {
                                                         </span>
                                                     <?php endif; ?>
                                                 </td>
+
+                                                <!-- Status -->
                                                 <td>
                                                     <?php if ($u['status'] == 'active' && !$isExpired): ?>
                                                         <span class="badge bg-success-soft text-success">
@@ -301,71 +323,72 @@ foreach ($users as $u) {
                                                         </span>
                                                     <?php endif; ?>
                                                 </td>
+
+                                                <!-- Expiry -->
                                                 <td>
                                                     <small class="<?= $isExpired ? 'text-danger' : 'text-muted' ?>">
                                                         <i class="fa fa-calendar me-1"></i>
                                                         <?= date("M d, Y H:i", strtotime($u['expires_at'])) ?>
                                                     </small>
                                                 </td>
+
+                                                <!-- Actions -->
                                                 <?php if ($_SESSION['user']['role'] !== "staff"): ?>
                                                     <td class="text-end">
                                                         <div class="btn-group btn-group-sm">
+
+                                                            <!-- View -->
                                                             <button class="btn btn-outline-primary viewBtn"
                                                                 data-bs-toggle="modal"
                                                                 data-bs-target="#viewUserModal"
-
-                                                                data-username="<?= $u['username'] ?>"
-                                                                data-router="<?= $u['router_name'] ?>"
-                                                                data-plan="<?= $u['plan_name'] ?>"
+                                                                data-username="<?= htmlspecialchars($u['username']) ?>"
+                                                                data-router="<?= htmlspecialchars($u['router_name']) ?>"
+                                                                data-plan="<?= htmlspecialchars($u['plan_name'] ?? '') ?>"
                                                                 data-status="<?= $u['status'] ?>"
-                                                                data-expiry="<?= $u['expires_at'] ?>">
-
+                                                                data-expiry="<?= $u['expires_at'] ?>"
+                                                                data-online="<?= $online ? '1' : '0' ?>"
+                                                                data-type="<?= $u['user_type'] ?>"
+                                                                title="View user">
                                                                 <i class="fa fa-eye"></i>
-
                                                             </button>
 
-                                                            <?php if ($u['user_type'] === 'pppoe'): ?>
+                                                            <!-- Extend time -->
+                                                            <button class="btn btn-outline-success extendBtn"
+                                                                data-bs-toggle="modal"
+                                                                data-bs-target="#extendUserModal"
+                                                                data-username="<?= htmlspecialchars($u['username']) ?>"
+                                                                data-type="<?= $u['user_type'] ?>"
+                                                                data-expiry="<?= $u['expires_at'] ?>"
+                                                                title="<?= $isPppoe ? 'Extend by days' : 'Add time' ?>">
+                                                                <i class="fa fa-clock-o"></i>
+                                                            </button>
 
-                                                                <?php if ($u['user_type'] === 'pppoe'): ?>
-
-                                                                    <button class="btn btn-outline-secondary editBtn"
-                                                                        data-bs-toggle="modal"
-                                                                        data-bs-target="#editUserModal"
-                                                                        data-username="<?= $u['username'] ?>"
-                                                                        data-plan="<?= $u['plan_id'] ?>"
-                                                                        data-expiry="<?= $u['expires_at'] ?>">
-                                                                        <i class="fa fa-edit"></i>
-                                                                    </button>
-
-                                                                <?php else: ?>
-
-                                                                    <button class="btn btn-outline-secondary" disabled title="Hotspot users cannot be edited">
-                                                                        <i class="fa fa-lock"></i>
-                                                                    </button>
-
-                                                                <?php endif; ?>
-
-
+                                                            <!-- Edit (PPPoE only) -->
+                                                            <?php if ($isPppoe): ?>
+                                                                <button class="btn btn-outline-secondary editBtn"
+                                                                    data-bs-toggle="modal"
+                                                                    data-bs-target="#editUserModal"
+                                                                    data-username="<?= htmlspecialchars($u['username']) ?>"
+                                                                    data-plan="<?= $u['plan_id'] ?>"
+                                                                    data-expiry="<?= $u['expires_at'] ?>"
+                                                                    title="Edit user">
+                                                                    <i class="fa fa-edit"></i>
+                                                                </button>
                                                             <?php endif; ?>
 
-
-
-
+                                                            <!-- Delete -->
                                                             <button class="btn btn-outline-danger deleteBtn"
-
                                                                 data-bs-toggle="modal"
-
                                                                 data-bs-target="#deleteUserModal"
-
-                                                                data-username="<?= $u['username'] ?>">
-
+                                                                data-username="<?= htmlspecialchars($u['username']) ?>"
+                                                                title="Delete user">
                                                                 <i class="fa fa-trash"></i>
-
                                                             </button>
 
                                                         </div>
                                                     </td>
                                                 <?php endif; ?>
+
                                             </tr>
                                         <?php endforeach; ?>
 
@@ -374,6 +397,7 @@ foreach ($users as $u) {
                             </div>
                         </div>
                     </div>
+
                 </div>
 
             </main>
@@ -387,97 +411,23 @@ foreach ($users as $u) {
     <script>
         document.addEventListener("DOMContentLoaded", () => {
             const filterButtons = document.querySelectorAll("[data-filter]");
-            const tableRows = document.querySelectorAll("tbody tr[data-type]");
+            const tableRows     = document.querySelectorAll("tbody tr[data-type]");
 
             filterButtons.forEach(btn => {
                 btn.addEventListener("click", () => {
-                    const filter = btn.dataset.filter;
-
-                    // Update active button
                     filterButtons.forEach(b => b.classList.remove("active"));
                     btn.classList.add("active");
 
-                    // Filter rows
+                    const filter = btn.dataset.filter;
                     tableRows.forEach(row => {
-                        if (filter === "all" || row.dataset.type === filter) {
-                            row.style.display = "";
-                        } else {
-                            row.style.display = "none";
-                        }
+                        row.style.display = (filter === "all" || row.dataset.type === filter) ? "" : "none";
                     });
                 });
             });
         });
     </script>
 
-    <script>
-        document.addEventListener("click", function(e) {
-
-
-            /* VIEW */
-
-
-            if (e.target.closest(".viewBtn")) {
-
-
-                let btn = e.target.closest(".viewBtn");
-
-
-                view_username.innerText = btn.dataset.username;
-
-                view_router.innerText = btn.dataset.router;
-
-                view_plan.innerText = btn.dataset.plan;
-
-                view_status.innerText = btn.dataset.status;
-
-                view_expiry.innerText = btn.dataset.expiry;
-
-
-            }
-
-
-            /* EDIT */
-
-
-            if (e.target.closest(".editBtn")) {
-
-
-                let btn = e.target.closest(".editBtn");
-
-
-                edit_username.value = btn.dataset.username;
-
-                edit_plan.value = btn.dataset.plan;
-
-                edit_expiry.value = btn.dataset.expiry.replace(" ", "T");
-
-
-            }
-
-
-            /* DELETE */
-
-
-            if (e.target.closest(".deleteBtn")) {
-
-
-                let btn = e.target.closest(".deleteBtn");
-
-
-                delete_username.value = btn.dataset.username;
-
-                delete_username_text.innerText = btn.dataset.username;
-
-
-            }
-
-
-        });
-    </script>
-
 </body>
-
 </html>
 
 <?php require_once "modals.php"; ?>
