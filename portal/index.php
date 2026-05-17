@@ -1436,6 +1436,7 @@ $formatted_phone = formatPhone($support_phone);
         transform: scale(1);
       }
     }
+
     /* ── PRE-AUTH TRIGGER ── */
     .preauth-trigger-wrap {
       text-align: center;
@@ -1539,8 +1540,15 @@ $formatted_phone = formatPhone($support_phone);
       flex-shrink: 0;
     }
 
-    .preauth-eye:hover { color: var(--accent); }
-    .preauth-eye svg { width: 16px; height: 16px; fill: currentColor; }
+    .preauth-eye:hover {
+      color: var(--accent);
+    }
+
+    .preauth-eye svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
 
     /* Inline field error */
     .field-error {
@@ -1579,7 +1587,7 @@ $formatted_phone = formatPhone($support_phone);
       align-items: flex-start;
       gap: 10px;
       background: var(--danger-lt);
-      border: 1px solid rgba(192,57,43,0.22);
+      border: 1px solid rgba(192, 57, 43, 0.22);
       border-radius: 12px;
       padding: 12px 14px;
       margin-top: 4px;
@@ -1614,14 +1622,18 @@ $formatted_phone = formatPhone($support_phone);
       height: 70px;
       border-radius: 50%;
       background: var(--accent-lt);
-      border: 2px solid rgba(42,125,79,0.35);
+      border: 2px solid rgba(42, 125, 79, 0.35);
       display: flex;
       align-items: center;
       justify-content: center;
-      animation: popIn 0.4s cubic-bezier(0.175,0.885,0.32,1.275) both;
+      animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
     }
 
-    .preauth-ok-icon svg { width: 30px; height: 30px; fill: var(--accent); }
+    .preauth-ok-icon svg {
+      width: 30px;
+      height: 30px;
+      fill: var(--accent);
+    }
 
     /* Preauth error icon */
     .preauth-err-icon {
@@ -1629,14 +1641,18 @@ $formatted_phone = formatPhone($support_phone);
       height: 70px;
       border-radius: 50%;
       background: var(--danger-lt);
-      border: 1.5px solid rgba(192,57,43,0.3);
+      border: 1.5px solid rgba(192, 57, 43, 0.3);
       display: flex;
       align-items: center;
       justify-content: center;
-      animation: popIn 0.4s cubic-bezier(0.175,0.885,0.32,1.275) both;
+      animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
     }
 
-    .preauth-err-icon svg { width: 28px; height: 28px; fill: var(--danger); }
+    .preauth-err-icon svg {
+      width: 28px;
+      height: 28px;
+      fill: var(--danger);
+    }
   </style>
 </head>
 
@@ -1656,44 +1672,42 @@ $formatted_phone = formatPhone($support_phone);
   </div>
 
   <!-- ── PROMO TICKER ── -->
-  <?php if ($router_id == 1): ?>
-    <div class="promo-ticker" aria-label="Promotional offer">
-      <div class="ticker-track">
-        <!-- Segment 1 -->
-        <span class="ticker-item">
-          <span class="ticker-icon">📶</span>
-          WiFi Installation — <strong>Router Included</strong>
-        </span>
-        <span class="ticker-dot"></span>
-        <span class="ticker-item">
-          <span class="ticker-icon">📅</span>
-          Monthly subscription from <strong>KES 1,500</strong>
-        </span>
-        <span class="ticker-dot"></span>
-        <span class="ticker-item">
-          <span class="ticker-icon">📞</span>
-          Call <strong>0701 625 882</strong> to get connected today
-        </span>
-        <span class="ticker-dot"></span>
-        <!-- Segment 2 — duplicate for seamless loop -->
-        <span class="ticker-item">
-          <span class="ticker-icon">📶</span>
-          WiFi Installation — <strong>Router Included</strong>
-        </span>
-        <span class="ticker-dot"></span>
-        <span class="ticker-item">
-          <span class="ticker-icon">📅</span>
-          Monthly subscription from <strong>KES 1,500</strong>
-        </span>
-        <span class="ticker-dot"></span>
-        <span class="ticker-item">
-          <span class="ticker-icon">📞</span>
-          Call <strong>0701 625 882</strong> to get connected today
-        </span>
-        <span class="ticker-dot"></span>
-      </div>
+  <div class="promo-ticker" aria-label="Promotional offer">
+    <div class="ticker-track">
+      <!-- Segment 1 -->
+      <span class="ticker-item">
+        <span class="ticker-icon">⚡</span>
+        Want a system like this for your business? — <strong>M-Pesa billing, auto-login &amp; real-time dashboard</strong>
+      </span>
+      <span class="ticker-dot"></span>
+      <span class="ticker-item">
+        <span class="ticker-icon">🛠️</span>
+        Full setup done for you — <strong>visit billing.inovatech.co.ke</strong>
+      </span>
+      <span class="ticker-dot"></span>
+      <span class="ticker-item">
+        <span class="ticker-icon">📞</span>
+        Call or WhatsApp <a href="tel:+254740770212" style="color:#fff;font-weight:700;">+254 740 770 212</a>
+      </span>
+      <span class="ticker-dot"></span>
+      <!-- Segment 2 — duplicate for seamless loop -->
+      <span class="ticker-item">
+        <span class="ticker-icon">⚡</span>
+        Want a system like this for your business? — <strong>M-Pesa billing, auto-login &amp; real-time dashboard</strong>
+      </span>
+      <span class="ticker-dot"></span>
+      <span class="ticker-item">
+        <span class="ticker-icon">🛠️</span>
+        Full setup done for you — <strong>visit billing.inovatech.co.ke</strong>
+      </span>
+      <span class="ticker-dot"></span>
+      <span class="ticker-item">
+        <span class="ticker-icon">📞</span>
+        Call or WhatsApp <a href="tel:+254740770212" style="color:#fff;font-weight:700;">+254 740 770 212</a>
+      </span>
+      <span class="ticker-dot"></span>
     </div>
-  <?php endif; ?>
+  </div>
   <div class="wrapper">
 
     <div class="header">
@@ -1735,7 +1749,9 @@ $formatted_phone = formatPhone($support_phone);
     <!-- ── Pre-auth trigger ── -->
     <div class="preauth-trigger-wrap">
       <button class="preauth-trigger" onclick="openPreauthModal()">
-        <svg viewBox="0 0 24 24"><path d="M12 1C8.676 1 6 3.676 6 7v1H4v15h16V8h-2V7c0-3.324-2.676-6-6-6zm0 2c2.276 0 4 1.724 4 4v1H8V7c0-2.276 1.724-4 4-4zm0 9a2 2 0 110 4 2 2 0 010-4z"/></svg>
+        <svg viewBox="0 0 24 24">
+          <path d="M12 1C8.676 1 6 3.676 6 7v1H4v15h16V8h-2V7c0-3.324-2.676-6-6-6zm0 2c2.276 0 4 1.724 4 4v1H8V7c0-2.276 1.724-4 4-4zm0 9a2 2 0 110 4 2 2 0 010-4z" />
+        </svg>
         Already subscribed? Log in
       </button>
     </div>
@@ -1937,8 +1953,8 @@ $formatted_phone = formatPhone($support_phone);
   <form id="preauthMikrotikForm" method="post" action="<?= htmlspecialchars($link_login_only) ?>" style="display:none">
     <input type="hidden" name="username" id="preauthHiddenUser">
     <input type="hidden" name="password" id="preauthHiddenPass">
-    <input type="hidden" name="dst"      value="<?= htmlspecialchars($linkorig) ?>">
-    <input type="hidden" name="popup"    value="true">
+    <input type="hidden" name="dst" value="<?= htmlspecialchars($linkorig) ?>">
+    <input type="hidden" name="popup" value="true">
   </form>
 
   <div id="preauthModal" class="modal">
@@ -1954,7 +1970,9 @@ $formatted_phone = formatPhone($support_phone);
 
           <!-- Error banner — shown on bad credentials -->
           <div class="preauth-banner" id="paBanner">
-            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+            <svg viewBox="0 0 24 24">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+            </svg>
             <div class="preauth-banner-text">
               <strong id="paBannerTitle">Login failed</strong>
               <span id="paBannerMsg">Check your credentials and try again.</span>
@@ -1965,14 +1983,16 @@ $formatted_phone = formatPhone($support_phone);
             <label for="paUsernameInput">Username</label>
             <div class="preauth-input-wrap" id="paUsernameWrap">
               <div class="preauth-input-icon">
-                <svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
+                </svg>
               </div>
               <input type="text"
-                     id="paUsernameInput"
-                     placeholder="Your username"
-                     autocomplete="username"
-                     autocapitalize="none"
-                     spellcheck="false">
+                id="paUsernameInput"
+                placeholder="Your username"
+                autocomplete="username"
+                autocapitalize="none"
+                spellcheck="false">
             </div>
             <span class="field-error" id="paUsernameErr">Please enter your username.</span>
           </div>
@@ -1981,26 +2001,34 @@ $formatted_phone = formatPhone($support_phone);
             <label for="paPasswordInput">Password</label>
             <div class="preauth-input-wrap" id="paPasswordWrap">
               <div class="preauth-input-icon">
-                <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                <svg viewBox="0 0 24 24">
+                  <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
+                </svg>
               </div>
               <input type="password"
-                     id="paPasswordInput"
-                     placeholder="Your password"
-                     autocomplete="current-password">
+                id="paPasswordInput"
+                placeholder="Your password"
+                autocomplete="current-password">
               <button type="button" class="preauth-eye" id="paEyeBtn" onclick="togglePaPassword()" title="Show/hide password">
-                <svg id="paEyeIcon" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                <svg id="paEyeIcon" viewBox="0 0 24 24">
+                  <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                </svg>
               </button>
             </div>
             <span class="field-error" id="paPasswordErr">Please enter your password.</span>
           </div>
 
           <button type="button" class="btn-pay" id="paLoginBtn" onclick="submitPreauthLogin()">
-            <svg viewBox="0 0 24 24"><path d="M11 7L9.6 8.4l2.6 2.6H2v2h10.2l-2.6 2.6L11 17l5-5-5-5zm9 12h-8v2h8c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-8v2h8v14z"/></svg>
+            <svg viewBox="0 0 24 24">
+              <path d="M11 7L9.6 8.4l2.6 2.6H2v2h10.2l-2.6 2.6L11 17l5-5-5-5zm9 12h-8v2h8c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-8v2h8v14z" />
+            </svg>
             <span>Connect Now</span>
           </button>
 
           <div class="mpesa-note" style="margin-top:14px;">
-            <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 6h2v2h-2V7zm0 4h2v6h-2v-6z"/></svg>
+            <svg viewBox="0 0 24 24">
+              <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 6h2v2h-2V7zm0 4h2v6h-2v-6z" />
+            </svg>
             Credentials are provided by your network administrator
           </div>
         </div>
@@ -2016,7 +2044,9 @@ $formatted_phone = formatPhone($support_phone);
       <!-- ── Screen 3: Success — connecting ── -->
       <div class="preauth-screen" id="paScreen3">
         <div class="preauth-ok-icon">
-          <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          <svg viewBox="0 0 24 24">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+          </svg>
         </div>
         <h3>Credentials verified ✓</h3>
         <p>Signing you in and redirecting to the internet…</p>
@@ -2025,7 +2055,9 @@ $formatted_phone = formatPhone($support_phone);
       <!-- ── Screen 4: Error ── -->
       <div class="preauth-screen" id="paScreen4">
         <div class="preauth-err-icon">
-          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          <svg viewBox="0 0 24 24">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+          </svg>
         </div>
         <h3 id="paErrTitle">Login Failed</h3>
         <p id="paErrMsg">Something went wrong. Please try again.</p>
@@ -2225,7 +2257,7 @@ $formatted_phone = formatPhone($support_phone);
     }
 
     function showPaScreen(n) {
-      [1,2,3,4].forEach(i => {
+      [1, 2, 3, 4].forEach(i => {
         const el = document.getElementById('paScreen' + i);
         el.style.display = (i === n) ? (i === 1 ? 'block' : 'flex') : 'none';
       });
@@ -2237,33 +2269,36 @@ $formatted_phone = formatPhone($support_phone);
 
     function showPaBanner(title, msg) {
       document.getElementById('paBannerTitle').textContent = title;
-      document.getElementById('paBannerMsg').textContent   = msg;
-      document.getElementById('paBanner').style.display   = 'flex';
+      document.getElementById('paBannerMsg').textContent = msg;
+      document.getElementById('paBanner').style.display = 'flex';
     }
 
     function clearPaFieldErrors() {
-      ['paUsernameWrap','paPasswordWrap'].forEach(id => {
+      ['paUsernameWrap', 'paPasswordWrap'].forEach(id => {
         document.getElementById(id).classList.remove('error');
       });
-      ['paUsernameErr','paPasswordErr'].forEach(id => {
+      ['paUsernameErr', 'paPasswordErr'].forEach(id => {
         document.getElementById(id).style.display = 'none';
       });
     }
 
     function togglePaPassword() {
-      const inp  = document.getElementById('paPasswordInput');
+      const inp = document.getElementById('paPasswordInput');
       const icon = document.getElementById('paEyeIcon');
       const show = inp.type === 'password';
-      inp.type   = show ? 'text' : 'password';
-      icon.innerHTML = show
-        ? '<path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46A11.804 11.804 0 001 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>'
-        : '<path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>';
+      inp.type = show ? 'text' : 'password';
+      icon.innerHTML = show ?
+        '<path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46A11.804 11.804 0 001 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>' :
+        '<path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>';
     }
 
     // Enter key + clear errors on typing
-    ['paUsernameInput','paPasswordInput'].forEach(id => {
+    ['paUsernameInput', 'paPasswordInput'].forEach(id => {
       document.getElementById(id).addEventListener('keydown', e => {
-        if (e.key === 'Enter') { e.preventDefault(); submitPreauthLogin(); }
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          submitPreauthLogin();
+        }
       });
       document.getElementById(id).addEventListener('input', () => {
         hidePaBanner();
@@ -2294,10 +2329,12 @@ $formatted_phone = formatPhone($support_phone);
       showPaScreen(2);
 
       try {
-        const res  = await fetch('preauth_login.php', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body:    `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+        const res = await fetch('preauth_login.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
         });
         const data = await res.json();
 
@@ -2324,7 +2361,7 @@ $formatted_phone = formatPhone($support_phone);
 
       } catch (err) {
         document.getElementById('paErrTitle').textContent = 'Connection Error';
-        document.getElementById('paErrMsg').textContent   = 'Could not reach the server. Please check your connection and try again.';
+        document.getElementById('paErrMsg').textContent = 'Could not reach the server. Please check your connection and try again.';
         showPaScreen(4);
       }
     }
