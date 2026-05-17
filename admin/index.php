@@ -1,8 +1,8 @@
 <?php
 // admin/dashboard/index.php  — starter admin dashboard
-require_once "../../core/db.php";
-require_once "../../core/auth.php";
-require_once "../../core/app.php";
+require_once "../core/db.php";
+require_once "../core/auth.php";
+require_once "../core/app.php";
 
 // TODO: replace with admin auth check
 // if (!is_admin()) { header("Location: ../../auth/login"); exit; }
@@ -74,13 +74,13 @@ $stmt = $pdo->query("
 ");
 $users = $stmt->fetchAll();
 ?>
-<?php require_once "../../partials/head.php" ?>
+<?php require_once "../partials/head.php" ?>
 
 <body class="nav-fixed bg-light">
-    <?php require_once "../partials/topnav.php" ?>
+    <?php require_once "partials/topnav.php" ?>
 
     <div id="layoutDrawer">
-        <?php require_once "../partials/sidebar.php" ?>
+        <?php require_once "partials/sidebar.php" ?>
 
         <div id="layoutDrawer_content">
             <main>
@@ -343,7 +343,7 @@ $users = $stmt->fetchAll();
                 </div><!-- /container -->
             </main>
 
-            <?php require_once "../../partials/footer.php" ?>
+            <?php require_once "../partials/footer.php" ?>
         </div>
     </div>
 
@@ -429,7 +429,7 @@ $users = $stmt->fetchAll();
         </div>
     </div>
 
-    <?php require_once "../../partials/scripts.php" ?>
+    <?php require_once "../partials/scripts.php" ?>
 
     <script>
     // Assign key modal
