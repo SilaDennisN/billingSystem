@@ -43,34 +43,34 @@ $pendingGateway = $pdo->query("
 ══════════════════════════════════════ */
 $stmt = $pdo->query("
     SELECT
-        u.user_id,
-        u.full_names,
-        u.phone_number,
-        u.email,
-        s.status           AS sub_status,
-        s.gateway_enabled,
-        s.gateway_type,
-        s.gateway_identifier,
-        s.gateway_plan,
-        s.gateway_expires_at,
-        k.provider         AS key_provider,
-        IFNULL(income.total, 0) AS monthly_income,
-        ROUND(IFNULL(income.total, 0) * 0.05, 2) AS platform_fee
-    FROM users u
-    LEFT JOIN subscriptions s ON s.user_id = u.user_id
-    LEFT JOIN user_api_keys k ON k.user_id = u.user_id
-        AND k.provider IN ('mpesa','pesaflux','intasend')
-    LEFT JOIN (
-        SELECT p.router_id, SUM(p.amount) AS total
-        FROM payments p
-        JOIN user_router_access ura ON ura.router_id = p.router_id
-        WHERE p.status = 'used'
-          AND MONTH(p.created_at) = MONTH(CURDATE())
-          AND YEAR(p.created_at)  = YEAR(CURDATE())
-        GROUP BY ura.user_id
-    ) income ON income.router_id = u.user_id
-    ORDER BY monthly_income DESC
-    LIMIT 50
+    u.user_id,
+    u.full_names,
+    u.phone_number,
+    u.email,
+    s.status           AS sub_status,
+    s.gateway_enabled,
+    s.gateway_type,
+    s.gateway_identifier,
+    s.gateway_plan,
+    s.gateway_expires_at,
+    k.provider         AS key_provider,
+    IFNULL(income.total, 0) AS monthly_income,
+    ROUND(IFNULL(income.total, 0) * 0.05, 2) AS platform_fee
+FROM users u
+LEFT JOIN subscriptions s ON s.user_id = u.user_id
+LEFT JOIN user_api_keys k ON k.user_id = u.user_id
+    AND k.provider IN ('mpesa', 'pesaflux', 'intasend')
+LEFT JOIN (
+    SELECT ura.user_id, SUM(p.amount) AS total   -- ← was p.router_id
+    FROM payments p
+    JOIN user_router_access ura ON ura.router_id = p.router_id
+    WHERE p.status = 'used'
+      AND MONTH(p.created_at) = MONTH(CURDATE())
+      AND YEAR(p.created_at)  = YEAR(CURDATE())
+    GROUP BY ura.user_id                          -- ← correct grouping
+) income ON income.user_id = u.user_id
+ORDER BY monthly_income DESC
+LIMIT 50
 ");
 $users = $stmt->fetchAll();
 ?>

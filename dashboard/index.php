@@ -7,10 +7,11 @@ if (!is_logged_in()) {
     header("Location: ../auth/login");
     exit;
 }
+$user_id = $_SESSION['user']['id'];
 check_subscription_gate($pdo, $user_id);
 
 
-$user_id = $_SESSION['user']['id'];
+
 
 $stmt = $pdo->prepare("
     SELECT router_id 
