@@ -29,105 +29,92 @@ $bootstrap_url = "{$base_url}/install/bootstrap.php?router_id={$router['router_i
 $cmd_fetch  = '/tool fetch mode=https url="' . $bootstrap_url . '" dst-path=bootstrap.rsc';
 $cmd_import = '/import bootstrap.rsc';
 
-// ── Manual terminal commands ───────────────────────────────────────────────
+// ── STEP 3 — Full base config (terminal, paste-and-run) ───────────────────
 //
-// Single-bridge topology:
-//   ether1              → WAN (DHCP client, NAT masquerade)
-//   bridge (ether2–5 + wlan1)  → all clients, same L2
-//     192.168.50.1/24    router IP, hotspot gateway
+// Topology (matches live export):
+//   ether1-ISP        → WAN (DHCP client, NAT masquerade)
+//   ether2-LAN        → disabled (enable + add to bridge-LAN if needed)
+//   ether3-AP         → bridge-LAN
+//   ether4-PPPoE      → bridge-PPPoE  (PPPoE subscribers, pool 10.10.10.x)
+//   ether5-HS         → bridge-HS     (hotspot wired)
+//   wlan1             → bridge-HS     (hotspot WiFi)
 //
-// Hotspot (WiFi + wired pre-auth) and PPPoE (wired subscribers) both bind
-// to the same bridge. Different pools separate their IP ranges.
-//   Hotspot pool  → 192.168.50.10–192.168.50.150
-//   PPPoE pool    → 192.168.50.200–192.168.50.250
+// IPs:
+//   bridge-LAN        → 192.168.88.1/24
+//   bridge-HS         → 192.168.50.1/24
+//   bridge-PPPoE      → 10.10.10.1/24
 //
-// WireGuard interface → wg-billing
-//
-// These commands must be run locally in WinBox terminal — touching bridge
-// ports and IPs over the API disconnects the session.
+// Profiles, users, hotspot packages are set manually per router.
 
-$lan_commands = implode("\n", [
-    '# ── 0. Clear default config (keeps WireGuard intact) ──────────────',
-    '# Remove wlan1 from any factory bridge so we can add it to ours cleanly.',
-    '/interface bridge port remove [find interface=wlan1]',
-    '# Disable any factory DHCP servers so they stop handing out 192.168.88.x.',
-    '/ip dhcp-server disable [find]',
-    '# Remove the factory 192.168.88.1 address to avoid IP conflicts.',
-    '/ip address remove [find address~"192.168.88"]',
+$base_commands = implode("\n", [
+    '# ════════════════════════════════════════════════════════════════',
+    '# Inovatech Base Config — paste entire block, press Enter',
+    '# Profiles / users / hotspot packages are set manually afterwards',
+    '# ════════════════════════════════════════════════════════════════',
     '',
-    '# ── 1. Single bridge — wired ports + WiFi, all on one L2 ───────────',
-    '/interface bridge add name=bridge comment="inovatech-main"',
-    '/interface bridge port add interface=ether2 bridge=bridge comment="inovatech-lan"',
-    '/interface bridge port add interface=ether3 bridge=bridge comment="inovatech-lan"',
-    '/interface bridge port add interface=ether4 bridge=bridge comment="inovatech-lan"',
-    '/interface bridge port add interface=ether5 bridge=bridge comment="inovatech-lan"',
-    '/interface bridge port add interface=wlan1  bridge=bridge comment="inovatech-lan"',
+    '# ── 1. Rename interfaces ─────────────────────────────────────────',
+    '/interface ethernet set [find default-name=ether1] name=ether1-ISP',
+    '/interface ethernet set [find default-name=ether2] name=ether2-LAN disabled=yes',
+    '/interface ethernet set [find default-name=ether3] name=ether3-AP',
+    '/interface ethernet set [find default-name=ether4] name=ether4-PPPoE',
+    '/interface ethernet set [find default-name=ether5] name=ether5-HS',
     '',
-    '# ── 2. Router IP on bridge ───────────────────────────────────────────',
-    '# This is also the hotspot gateway and PPPoE local address.',
-    '/ip address add address=192.168.50.1/24 interface=bridge comment="inovatech-lan"',
+    '# ── 2. Create three bridges ──────────────────────────────────────',
+    '/interface bridge add name=bridge-LAN',
+    '/interface bridge add name=bridge-PPPoE',
+    '/interface bridge add name=bridge-HS',
     '',
-    '# ── 3. WAN — DHCP client on ether1 ─────────────────────────────────',
-    '/ip dhcp-client add interface=ether1 disabled=no add-default-route=yes use-peer-dns=yes comment="inovatech-wan"',
+    '# ── 3. Assign ports to bridges ───────────────────────────────────',
+    '/interface bridge port add interface=ether3-AP    bridge=bridge-LAN',
+    '/interface bridge port add interface=ether4-PPPoE bridge=bridge-PPPoE',
+    '/interface bridge port add interface=ether5-HS    bridge=bridge-HS',
+    '/interface bridge port add interface=wlan1        bridge=bridge-HS',
     '',
-    '# ── 4. NAT masquerade ────────────────────────────────────────────────',
-    '# All LAN/hotspot/PPPoE traffic exits via ether1 with NAT.',
-    '/ip firewall nat add chain=srcnat action=masquerade out-interface=ether1 comment="inovatech-masquerade"',
+    '# ── 4. IP addresses ──────────────────────────────────────────────',
+    '/ip address add address=192.168.88.1/24 interface=bridge-LAN    network=192.168.88.0',
+    '/ip address add address=192.168.50.1/24 interface=bridge-HS     network=192.168.50.0',
+    '/ip address add address=10.10.10.1/24   interface=bridge-PPPoE  network=10.10.10.0',
     '',
-    '# ── 5. Allow WireGuard VPN — REQUIRED before Step 5 ─────────────────',
-    '# The default MikroTik firewall drops all input not from established',
-    '# connections. This rule opens the VPN interface so the billing server',
-    '# can reach the router API in Step 5. place-before=0 puts it at the top.',
-    '/ip firewall filter add chain=input in-interface=wg-billing action=accept place-before=0 comment="inovatech-vpn"',
+    '# ── 5. DHCP client on WAN ────────────────────────────────────────',
+    '/ip dhcp-client add interface=ether1-ISP disabled=no add-default-route=yes use-peer-dns=yes comment="inovatech-wan"',
+    '',
+    '# ── 6. IP pools ──────────────────────────────────────────────────',
+    '/ip pool add name=pool-LAN   ranges=192.168.88.2-192.168.88.254',
+    '/ip pool add name=pool-PPPoE ranges=10.10.10.3-10.10.10.254',
+    '/ip pool add name=pool-HS    ranges=192.168.50.3-192.168.50.254',
+    '',
+    '# ── 7. DHCP servers ──────────────────────────────────────────────',
+    '/ip dhcp-server add name=serverLAN interface=bridge-LAN  address-pool=pool-LAN lease-time=1d',
+    '/ip dhcp-server add name=server-hs  interface=bridge-HS   address-pool=pool-HS  lease-time=1d',
+    '/ip dhcp-server network add address=192.168.88.0/24 gateway=192.168.88.1',
+    '/ip dhcp-server network add address=192.168.50.0/24 gateway=192.168.50.1',
+    '',
+    '# ── 8. WiFi (AP-bridge mode, Kenya) ──────────────────────────────',
+    '/interface wireless set [find default-name=wlan1] mode=ap-bridge band=2ghz-b/g/n country=kenya disabled=no ssid="FreeBest" wireless-protocol=802.11 wps-mode=disabled',
+    '',
+    '# ── 9. DNS ───────────────────────────────────────────────────────',
+    '/ip dns set servers=8.8.8.8,8.8.4.4 allow-remote-requests=yes',
+    '',
+    '# ── 10. NAT masquerade ────────────────────────────────────────────',
+    '/ip firewall nat add chain=srcnat action=masquerade out-interface=ether1-ISP comment="inovatech-masquerade"',
+    '/ip firewall nat add chain=srcnat action=masquerade src-address=192.168.50.0/24 comment="masquerade hotspot network"',
+    '',
+    '# ── 11. PPPoE server ─────────────────────────────────────────────',
+    '/interface pppoe-server server add interface=bridge-PPPoE service-name=servicePPPoE one-session-per-host=yes disabled=no',
+    '',
+    '# ── 12. MSS clamp for PPPoE ──────────────────────────────────────',
+    '/ip firewall mangle add chain=forward protocol=tcp tcp-flags=syn action=change-mss new-mss=1452 out-interface=bridge-PPPoE',
+    '',
+    '# ── 13. System clock ─────────────────────────────────────────────',
+    '/system clock set time-zone-name=Africa/Nairobi',
 ]);
 
-// ── Post-provisioning fix commands ────────────────────────────────────────
-//
-// Run these AFTER the API provisioning completes successfully.
-// They fix issues that the API cannot handle reliably across all RouterOS
-// versions — specifically wlan1 mode/state and the hotspot server.
-//
-// Fix A: Release wlan1 from CAPsMAN if it was managed (XS flags).
-//   If wlan1 shows XS flags in Interfaces, CAPsMAN has claimed it.
-//   These two commands disable CAP client and CAPsMAN manager.
-//
-// Fix B: Set wlan1 to AP-bridge mode and enable it.
-//   Factory default is often mode=station (client mode) which cannot
-//   broadcast. This forces it into access-point mode.
-//
-// Fix C: Create the hotspot server manually.
-//   On some RouterOS versions the /ip/hotspot API path returns session
-//   data instead of server list, causing the add to silently fail.
-//   This command creates it directly in the terminal.
-
-$fix_commands = implode("\n", [
-    '# ── Fix A: Release wlan1 from CAPsMAN (only needed if wlan1 shows XS flags) ──',
-    '# Run /interface wireless print first — if you see X and S flags on wlan1,',
-    '# CAPsMAN is managing it. These two commands release it back to local control.',
-    '/interface wireless cap set enabled=no',
-    '/caps-man manager set enabled=no',
-    '',
-    '# ── Fix B: Set wlan1 to AP mode and enable it ────────────────────────────────',
-    '# Factory default is mode=station (WiFi client). This sets it to access-point',
-    '# mode so it can broadcast the hotspot SSID. Run this even if Fix A was not needed.',
-    '/interface wireless set wlan1 mode=ap-bridge disabled=no ssid="Inovatech WiFi"',
-    '',
-    '# Verify — should show R (running) flag and mode=ap-bridge with no X flag.',
-    '/interface wireless print where name=wlan1',
-    '',
-    '# ── Fix C: Create hotspot server (if IP → Hotspot shows no server) ───────────',
-    '# On some RouterOS versions the API cannot create the hotspot server reliably.',
-    '# If IP → Hotspot is empty after provisioning, run this command manually.',
-    '/ip hotspot add name=hotspot1 interface=bridge address-pool=hotspot_pool profile=inovatech-profile disabled=no',
-    '',
-    '# Verify — should show hotspot1 listed and running.',
-    '/ip hotspot print',
-]);
+// ── STEP 5 — WireGuard (run AFTER internet confirmed) ─────────────────────
 
 ?>
 <?php require_once "../partials/head.php"; ?>
 <style>
-/* ── Provisioning page styles ─────────────────────────────────────────── */
+/* ── Provisioning page ───────────────────────────────────────────────── */
 .step-card {
     border-radius: 10px;
     border: 1px solid #dee2e6;
@@ -153,23 +140,21 @@ $fix_commands = implode("\n", [
 }
 .step-body { padding: 1.1rem 1.25rem; background: #fff; }
 
-/* colour themes per step */
+/* colour themes */
 .step-neutral  .step-header { background: #f8f9fa; color: #212529; }
 .step-neutral  .step-num    { background: #6c757d; color: #fff; }
 .step-blue     .step-header { background: #e7f1ff; color: #0a58ca; }
 .step-blue     .step-num    { background: #0d6efd; color: #fff; }
-.step-vpn      .step-header { background: #e8f5e9; color: #146c43; border-bottom: 2px solid #198754; }
-.step-vpn      .step-num    { background: #198754; color: #fff; }
 .step-warning  .step-header { background: #fff8e1; color: #664d03; border-bottom: 2px solid #ffc107; }
 .step-warning  .step-num    { background: #ffc107; color: #212529; }
+.step-vpn      .step-header { background: #e8f5e9; color: #146c43; border-bottom: 2px solid #198754; }
+.step-vpn      .step-num    { background: #198754; color: #fff; }
 .step-success  .step-header { background: #d1e7dd; color: #0a3622; border-bottom: 2px solid #198754; }
 .step-success  .step-num    { background: #198754; color: #fff; }
-.step-danger   .step-header { background: #fff3cd; color: #664d03; border-bottom: 2px solid #fd7e14; }
-.step-danger   .step-num    { background: #fd7e14; color: #fff; }
 .step-upload   .step-header { background: #e7f1ff; color: #0a58ca; }
 .step-upload   .step-num    { background: #0d6efd; color: #fff; }
 
-/* terminal blocks */
+/* terminal */
 .terminal-block {
     background: #1e1e2e;
     border-radius: 7px;
@@ -179,79 +164,43 @@ $fix_commands = implode("\n", [
 .terminal-topbar {
     background: #2a2a3d;
     padding: .35rem .75rem;
-    display: flex;
-    align-items: center;
-    gap: .4rem;
+    display: flex; align-items: center; gap: .4rem;
 }
-.terminal-topbar .dot {
-    width: 10px; height: 10px; border-radius: 50%;
-}
+.terminal-topbar .dot { width: 10px; height: 10px; border-radius: 50%; }
 .dot-red    { background: #ff5f57; }
 .dot-yellow { background: #febc2e; }
 .dot-green  { background: #28c840; }
 .terminal-label {
-    font-size: .7rem;
-    color: #888;
-    margin-left: auto;
-    letter-spacing: .04em;
-    text-transform: uppercase;
+    font-size: .7rem; color: #888;
+    margin-left: auto; letter-spacing: .04em; text-transform: uppercase;
 }
 .terminal-body {
     padding: .85rem 1rem;
-    color: #cdd6f4;
-    font-size: .78rem;
-    line-height: 1.75;
-    white-space: pre-wrap;
-    word-break: break-all;
-    max-height: 380px;
-    overflow-y: auto;
+    color: #cdd6f4; font-size: .78rem;
+    line-height: 1.75; white-space: pre-wrap; word-break: break-all;
+    max-height: 420px; overflow-y: auto;
 }
 .terminal-body .cmd-comment { color: #6c7086; }
 .terminal-body .cmd-prompt  { color: #a6e3a1; }
-
-.copy-overlay-btn {
-    position: absolute; top: .5rem; right: .5rem;
-    z-index: 2;
-}
+.copy-overlay-btn { position: absolute; top: .5rem; right: .5rem; z-index: 2; }
 
 /* topology badges */
 .topo-badge {
     display: flex; align-items: center; gap: .5rem;
-    padding: .5rem .85rem;
-    border-radius: 8px;
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    font-size: .78rem;
+    padding: .5rem .85rem; border-radius: 8px;
+    background: #f8f9fa; border: 1px solid #dee2e6; font-size: .78rem;
 }
 .topo-badge .material-icons { font-size: 1.1rem; }
 
-/* provision step cards */
+/* provision steps */
 .prov-step {
     display: flex; align-items: flex-start; gap: .6rem;
-    padding: .65rem .85rem;
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
-    background: #f8f9fa;
-    transition: background .2s;
+    padding: .65rem .85rem; border-radius: 8px;
+    border: 1px solid #dee2e6; background: #f8f9fa; transition: background .2s;
 }
 .prov-step.running { background: #fff8e1; border-color: #ffc107; }
 .prov-step.ok      { background: #d1e7dd; border-color: #198754; }
 .prov-step.error   { background: #f8d7da; border-color: #dc3545; }
-
-/* fix-command section tags */
-.fix-tag {
-    display: inline-flex; align-items: center; gap: .3rem;
-    font-size: .7rem; font-weight: 600;
-    padding: .15rem .5rem; border-radius: 4px;
-    text-transform: uppercase; letter-spacing: .05em;
-    margin-bottom: .4rem;
-}
-.fix-tag-a { background: #fff3cd; color: #664d03; border: 1px solid #ffc107; }
-.fix-tag-b { background: #cfe2ff; color: #084298; border: 1px solid #9ec5fe; }
-.fix-tag-c { background: #d1e7dd; color: #0a3622; border: 1px solid #a3cfbb; }
-
-.fix-cmd-block { margin-bottom: 1.25rem; }
-.fix-cmd-block:last-child { margin-bottom: 0; }
 </style>
 
 <body class="nav-fixed bg-light">
@@ -275,7 +224,7 @@ $fix_commands = implode("\n", [
 
             <div class="container-xl px-5 mt-4 pb-5">
 
-                <!-- ── Network topology summary ──────────────────────────── -->
+                <!-- ── Topology summary ──────────────────────────────── -->
                 <div class="card mb-4 border-0 shadow-sm">
                     <div class="card-body py-3">
                         <p class="fw-semibold mb-2 small text-muted text-uppercase" style="letter-spacing:.06em">
@@ -284,48 +233,52 @@ $fix_commands = implode("\n", [
                         <div class="d-flex flex-wrap gap-2">
                             <div class="topo-badge">
                                 <i class="material-icons text-primary">router</i>
-                                <div><div class="fw-semibold">ether1</div><div class="text-muted">WAN — DHCP client + NAT</div></div>
+                                <div><div class="fw-semibold">ether1-ISP</div><div class="text-muted">WAN — DHCP + NAT</div></div>
                             </div>
                             <div class="topo-badge">
-                                <i class="material-icons text-success">device_hub</i>
-                                <div><div class="fw-semibold">bridge (ether2–5 + wlan1)</div><div class="text-muted">192.168.50.1/24 — all clients</div></div>
+                                <i class="material-icons text-secondary">cable</i>
+                                <div><div class="fw-semibold">ether3-AP → bridge-LAN</div><div class="text-muted">192.168.88.1/24</div></div>
                             </div>
                             <div class="topo-badge">
                                 <i class="material-icons text-warning">wifi</i>
-                                <div><div class="fw-semibold">Hotspot pool</div><div class="text-muted">.10–.150 → captive portal</div></div>
+                                <div><div class="fw-semibold">wlan1 + ether5-HS → bridge-HS</div><div class="text-muted">192.168.50.1/24 — hotspot</div></div>
                             </div>
                             <div class="topo-badge">
                                 <i class="material-icons text-info">cable</i>
-                                <div><div class="fw-semibold">PPPoE pool</div><div class="text-muted">.200–.250 → dial-in</div></div>
+                                <div><div class="fw-semibold">ether4-PPPoE → bridge-PPPoE</div><div class="text-muted">10.10.10.1/24 — PPPoE dial-in</div></div>
                             </div>
                             <div class="topo-badge">
-                                <i class="material-icons text-secondary">vpn_lock</i>
+                                <i class="material-icons text-success">vpn_lock</i>
                                 <div><div class="fw-semibold">wg-billing</div><div class="text-muted">WireGuard → billing VPS</div></div>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                <!-- ════════════════════════════════════════════════════════
-                     STEP 1 — Internet
-                ════════════════════════════════════════════════════════ -->
-                <div class="step-card step-neutral">
-                    <div class="step-header">
-                        <span class="step-num">1</span>
-                        <i class="material-icons text-muted" style="font-size:1.1rem">power</i>
-                        Connect Router to Internet
-                    </div>
-                    <div class="step-body">
-                        <p class="mb-0 text-muted small">
-                            Plug <strong class="text-dark">ether1</strong> into your internet source (ONT, modem, or uplink) and power on the router.
-                            Wait for the status LED to stabilise before proceeding.
+                        <p class="text-muted mt-2 mb-0" style="font-size:.75rem">
+                            <i class="material-icons align-middle" style="font-size:.85rem">info</i>
+                            Hotspot profiles, PPPoE profiles, users, and packages are configured manually per router after provisioning.
                         </p>
                     </div>
                 </div>
 
-                <!-- ════════════════════════════════════════════════════════
+                <!-- ════════════════════════════════════════════════════
+                     STEP 1 — Connect to internet
+                ════════════════════════════════════════════════════ -->
+                <div class="step-card step-neutral">
+                    <div class="step-header">
+                        <span class="step-num">1</span>
+                        <i class="material-icons text-muted" style="font-size:1.1rem">power</i>
+                        Connect <strong class="ms-1">ether1</strong> to Internet &amp; Power On
+                    </div>
+                    <div class="step-body">
+                        <p class="mb-0 text-muted small">
+                            Plug <strong class="text-dark">ether1-ISP</strong> into your ONT, modem, or uplink.
+                            Power on and wait for the status LED to stabilise before proceeding.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- ════════════════════════════════════════════════════
                      STEP 2 — WinBox
-                ════════════════════════════════════════════════════════ -->
+                ════════════════════════════════════════════════════ -->
                 <div class="step-card step-blue">
                     <div class="step-header">
                         <span class="step-num">2</span>
@@ -333,7 +286,7 @@ $fix_commands = implode("\n", [
                         Open WinBox — Connect to <code style="font-size:.85em">192.168.88.1</code>
                     </div>
                     <div class="step-body">
-                        <p class="small text-muted mb-3">Username <code>admin</code>, no password. Open <strong>New Terminal</strong> once inside.</p>
+                        <p class="small text-muted mb-3">Username <code>admin</code>, no password (fresh reset). Open <strong>New Terminal</strong> once inside.</p>
                         <div class="row g-2 mb-3">
                             <div class="col-6 col-sm-3">
                                 <a href="https://mt.lv/winbox" target="_blank" class="btn btn-outline-primary w-100 btn-sm">
@@ -366,19 +319,102 @@ $fix_commands = implode("\n", [
                     </div>
                 </div>
 
-                <!-- ════════════════════════════════════════════════════════
-                     STEP 3 — WireGuard VPN
-                ════════════════════════════════════════════════════════ -->
-                <div class="step-card step-vpn">
+                <!-- ════════════════════════════════════════════════════
+                     STEP 3 — Base config
+                ════════════════════════════════════════════════════ -->
+                <div class="step-card step-warning">
                     <div class="step-header">
                         <span class="step-num">3</span>
+                        <i class="material-icons" style="font-size:1.1rem;color:#997404">terminal</i>
+                        Paste Base Config in WinBox Terminal
+                    </div>
+                    <div class="step-body">
+                        <p class="text-muted small mb-2">
+                            Sets up all interfaces, bridges, IPs, DHCP, WiFi, DNS, NAT, PPPoE server, and clock.
+                            <strong>Select All → Copy → Paste into terminal → Enter.</strong>
+                        </p>
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <span class="badge bg-secondary fw-normal">3 bridges</span>
+                            <span class="badge bg-primary fw-normal">IPs + DHCP</span>
+                            <span class="badge bg-success fw-normal">WiFi AP-bridge</span>
+                            <span class="badge bg-primary fw-normal">WAN + NAT</span>
+                            <span class="badge bg-info text-dark fw-normal">PPPoE server</span>
+                            <span class="badge bg-warning text-dark fw-normal">DNS + Clock</span>
+                        </div>
+
+                        <div class="position-relative">
+                            <div class="terminal-block">
+                                <div class="terminal-topbar">
+                                    <span class="dot dot-red"></span>
+                                    <span class="dot dot-yellow"></span>
+                                    <span class="dot dot-green"></span>
+                                    <span class="terminal-label">WinBox Terminal — Base Config</span>
+                                </div>
+                                <div class="terminal-body"><?php
+                                    foreach (explode("\n", $base_commands) as $line) {
+                                        if (str_starts_with(trim($line), '#')) {
+                                            echo '<span class="cmd-comment">' . htmlspecialchars($line) . '</span>' . "\n";
+                                        } elseif (trim($line) === '') {
+                                            echo "\n";
+                                        } else {
+                                            echo '<span class="cmd-prompt">$ </span>' . htmlspecialchars($line) . "\n";
+                                        }
+                                    }
+                                ?></div>
+                            </div>
+                            <textarea id="base-commands" class="d-none" readonly><?= htmlspecialchars($base_commands) ?></textarea>
+                            <button class="btn btn-warning btn-sm copy-overlay-btn" onclick="copyText('base-commands', this)">
+                                <i class="material-icons align-middle" style="font-size:.9rem">content_copy</i> Copy All
+                            </button>
+                        </div>
+
+                        <div class="alert alert-warning d-flex align-items-start gap-2 py-2 mt-3 mb-0">
+                            <i class="material-icons mt-1" style="font-size:1rem">warning</i>
+                            <div class="small">
+                                After pasting, your WinBox session on <code>192.168.88.1</code> may disconnect.
+                                Reconnect on <code>192.168.88.1</code> (via ether3-AP) or <code>192.168.50.1</code> (via ether5-HS / WiFi) before continuing.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ════════════════════════════════════════════════════
+                     STEP 4 — Verify internet
+                ════════════════════════════════════════════════════ -->
+                <div class="step-card step-neutral">
+                    <div class="step-header">
+                        <span class="step-num">4</span>
+                        <i class="material-icons text-muted" style="font-size:1.1rem">network_check</i>
+                        Verify Internet on the Router
+                    </div>
+                    <div class="step-body">
+                        <p class="small text-muted mb-2">
+                            In WinBox terminal, confirm the router has an internet connection before running the VPN script.
+                        </p>
+                        <div class="input-group" style="max-width:480px">
+                            <span class="input-group-text bg-dark text-white border-dark font-monospace small">$</span>
+                            <input type="text" class="form-control font-monospace bg-dark text-white border-dark" style="font-size:.82rem" value="/ping 8.8.8.8 count=3" readonly id="ping-cmd">
+                            <button class="btn btn-outline-secondary" onclick="copyText('ping-cmd', this)" title="Copy">
+                                <i class="material-icons" style="font-size:1rem">content_copy</i>
+                            </button>
+                        </div>
+                        <p class="text-muted small mt-2 mb-0">You should see replies before proceeding. If no replies, check ether1-ISP cabling and the uplink.</p>
+                    </div>
+                </div>
+
+                <!-- ════════════════════════════════════════════════════
+                     STEP 5 — WireGuard VPN
+                ════════════════════════════════════════════════════ -->
+                <div class="step-card step-vpn">
+                    <div class="step-header">
+                        <span class="step-num">5</span>
                         <i class="material-icons" style="font-size:1.1rem;color:#198754">vpn_lock</i>
-                        Run 2 Commands — Sets Up WireGuard VPN Only
+                        Run 2 Commands — Sets Up WireGuard VPN
                     </div>
                     <div class="step-body">
                         <p class="text-muted small mb-3">
-                            These commands create the WireGuard interface and establish the VPN tunnel.
-                            <strong>Your network config is not touched.</strong>
+                            Now that the router has internet, fetch and run the VPN bootstrap script.
+                            <strong>This only touches WireGuard</strong> — nothing else is changed.
                         </p>
 
                         <p class="small fw-semibold mb-1 text-muted text-uppercase" style="font-size:.7rem;letter-spacing:.05em">CMD 1 — Download VPN script</p>
@@ -403,7 +439,7 @@ $fix_commands = implode("\n", [
                             <div class="alert alert-success d-flex align-items-start gap-2 py-2 mb-0 flex-grow-1">
                                 <i class="material-icons mt-1" style="font-size:1rem">info</i>
                                 <div class="small">
-                                    Watch <strong>WinBox → Log</strong> for <strong>"WireGuard DONE — VPN tunnel is up"</strong>, then continue to Step 4.
+                                    Watch <strong>WinBox → Log</strong> for <strong>"WireGuard DONE — VPN tunnel is up"</strong>, then continue to Step 6.
                                 </div>
                             </div>
                             <div class="text-center">
@@ -415,87 +451,27 @@ $fix_commands = implode("\n", [
                     </div>
                 </div>
 
-                <!-- ════════════════════════════════════════════════════════
-                     STEP 4 — LAN commands
-                ════════════════════════════════════════════════════════ -->
-                <div class="step-card step-warning">
-                    <div class="step-header">
-                        <span class="step-num">4</span>
-                        <i class="material-icons" style="font-size:1.1rem;color:#997404">terminal</i>
-                        Paste LAN Commands in WinBox Terminal
-                    </div>
-                    <div class="step-body">
-                        <p class="text-muted small mb-2">
-                            Clears factory config, creates the single bridge with all ports (including WiFi),
-                            sets the router IP, configures NAT, and <strong class="text-danger">opens the firewall for the VPN</strong>.
-                            <strong>Select All → Copy → Paste into WinBox terminal → Enter.</strong>
-                        </p>
-
-                        <div class="d-flex flex-wrap gap-2 mb-3">
-                            <span class="badge bg-secondary fw-normal">Clears factory 192.168.88.x</span>
-                            <span class="badge bg-success fw-normal">bridge: ether2–5 + wlan1</span>
-                            <span class="badge bg-primary fw-normal">192.168.50.1/24 on bridge</span>
-                            <span class="badge bg-primary fw-normal">WAN + NAT on ether1</span>
-                            <span class="badge bg-danger fw-normal">🔒 Firewall: allow VPN</span>
-                        </div>
-
-                        <div class="position-relative">
-                            <div class="terminal-block">
-                                <div class="terminal-topbar">
-                                    <span class="dot dot-red"></span>
-                                    <span class="dot dot-yellow"></span>
-                                    <span class="dot dot-green"></span>
-                                    <span class="terminal-label">WinBox Terminal — LAN Setup</span>
-                                </div>
-                                <div class="terminal-body" id="lan-commands-display"><?php
-                                    foreach (explode("\n", $lan_commands) as $line) {
-                                        if (str_starts_with(trim($line), '#')) {
-                                            echo '<span class="cmd-comment">' . htmlspecialchars($line) . '</span>' . "\n";
-                                        } elseif (trim($line) === '') {
-                                            echo "\n";
-                                        } else {
-                                            echo '<span class="cmd-prompt">$ </span>' . htmlspecialchars($line) . "\n";
-                                        }
-                                    }
-                                ?></div>
-                            </div>
-                            <textarea id="lan-commands" class="d-none" readonly><?= htmlspecialchars($lan_commands) ?></textarea>
-                            <button class="btn btn-warning btn-sm copy-overlay-btn" onclick="copyText('lan-commands', this)">
-                                <i class="material-icons align-middle" style="font-size:.9rem">content_copy</i> Copy All
-                            </button>
-                        </div>
-
-                        <div class="alert alert-warning d-flex align-items-start gap-2 py-2 mt-3 mb-0">
-                            <i class="material-icons mt-1" style="font-size:1rem">warning</i>
-                            <div class="small">
-                                After pasting, your WinBox session on <code>192.168.88.1</code> will disconnect.
-                                Reconnect via <code>192.168.50.1</code> if needed, then continue to Step 5.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ════════════════════════════════════════════════════════
-                     STEP 5 — API Provision
-                ════════════════════════════════════════════════════════ -->
+                <!-- ════════════════════════════════════════════════════
+                     STEP 6 — API Provision
+                ════════════════════════════════════════════════════ -->
                 <div class="step-card step-success">
                     <div class="step-header">
-                        <span class="step-num">5</span>
+                        <span class="step-num">6</span>
                         <i class="material-icons" style="font-size:1.1rem;color:#198754">rocket_launch</i>
-                        Provision — Hotspot, PPPoE, Firewall, DNS
+                        Provision — Hotspot Server &amp; Firewall
                     </div>
                     <div class="step-body">
                         <p class="text-muted small mb-3">
-                            Once LAN commands are pasted and the VPN is up, click below.
-                            The billing server will apply the remaining config over the VPN tunnel.
+                            Once the VPN is up, click below. The billing server applies remaining config
+                            (hotspot server, walled garden, firewall rules) over the VPN tunnel.
                         </p>
 
                         <div class="row g-2 mb-4">
                             <?php
                             $prov_steps = [
-                                ['icon' => 'wifi',     'label' => 'Hotspot + Captive Portal', 'desc' => 'SSID, DHCP, hotspot server on bridge, walled garden'],
-                                ['icon' => 'cable',    'label' => 'PPPoE Server',              'desc' => 'Pool, profile, and server on same bridge'],
-                                ['icon' => 'security', 'label' => 'Firewall, NAT + DNS',        'desc' => 'Filter rules, masquerade, DNS resolver, identity'],
+                                ['icon' => 'wifi',     'label' => 'Hotspot Server',        'desc' => 'Hotspot server on bridge-HS, walled garden, hotspot profile'],
+                                ['icon' => 'security', 'label' => 'Firewall + NAT',         'desc' => 'Filter rules, VPN accept, masquerade'],
+                                ['icon' => 'dns',      'label' => 'DNS + Identity',          'desc' => 'DNS resolver, system identity'],
                             ];
                             foreach ($prov_steps as $i => $s): ?>
                             <div class="col-12 col-md-6">
@@ -521,174 +497,9 @@ $fix_commands = implode("\n", [
                     </div>
                 </div>
 
-                <!-- ════════════════════════════════════════════════════════
-                     STEP 6 — Post-provisioning fixes  ★ NEW
-                ════════════════════════════════════════════════════════ -->
-                <div class="step-card step-danger">
-                    <div class="step-header">
-                        <span class="step-num">6</span>
-                        <i class="material-icons" style="font-size:1.1rem;color:#fd7e14">build</i>
-                        Post-Provisioning Fixes
-                        <span class="badge bg-warning text-dark ms-auto fw-normal" style="font-size:.7rem">Run after Step 5 succeeds</span>
-                    </div>
-                    <div class="step-body">
-                        <p class="text-muted small mb-4">
-                            Some RouterOS versions require these manual fixes after provisioning.
-                            Apply only the fixes relevant to your situation — each is labelled with when it is needed.
-                        </p>
-
-                        <!-- Fix A -->
-                        <div class="fix-cmd-block">
-                            <span class="fix-tag fix-tag-a">
-                                <i class="material-icons" style="font-size:.8rem">wifi_off</i>
-                                Fix A — wlan1 shows XS flags (CAPsMAN)
-                            </span>
-                            <p class="small text-muted mb-2">
-                                In <strong>Interfaces</strong>, if wlan1 has <code>X</code> (disabled) and <code>S</code> (slave/CAPsMAN) flags,
-                                run these two commands to release it back to local control.
-                            </p>
-                            <div class="terminal-block position-relative">
-                                <div class="terminal-topbar">
-                                    <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-                                    <span class="terminal-label">Release wlan1 from CAPsMAN</span>
-                                </div>
-                                <div class="terminal-body"><?php
-                                    $fixA = "/interface wireless cap set enabled=no\n/caps-man manager set enabled=no";
-                                    foreach (explode("\n", $fixA) as $l) {
-                                        echo '<span class="cmd-prompt">$ </span>' . htmlspecialchars($l) . "\n";
-                                    }
-                                ?></div>
-                            </div>
-                            <textarea id="fix-a" class="d-none" readonly>/interface wireless cap set enabled=no
-/caps-man manager set enabled=no</textarea>
-                            <button class="btn btn-sm btn-outline-warning mt-2" onclick="copyText('fix-a', this)">
-                                <i class="material-icons align-middle" style="font-size:.85rem">content_copy</i> Copy Fix A
-                            </button>
-                        </div>
-
-                        <!-- Fix B -->
-                        <div class="fix-cmd-block">
-                            <span class="fix-tag fix-tag-b">
-                                <i class="material-icons" style="font-size:.8rem">wifi</i>
-                                Fix B — WiFi not broadcasting / wlan1 disabled
-                            </span>
-                            <p class="small text-muted mb-2">
-                                Factory default is often <code>mode=station</code> (client mode). This sets wlan1 to access-point mode
-                                and enables it. <strong>Always run this</strong> even if Fix A was not needed.
-                                The verify command should show <code>R</code> (running) with no <code>X</code> flag.
-                            </p>
-                            <div class="terminal-block position-relative">
-                                <div class="terminal-topbar">
-                                    <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-                                    <span class="terminal-label">Set wlan1 to AP mode</span>
-                                </div>
-                                <div class="terminal-body"><?php
-                                    $fixB = '/interface wireless set wlan1 mode=ap-bridge disabled=no ssid="Inovatech WiFi"' . "\n\n" .
-                                            '# Verify — should show R (running), mode=ap-bridge, no X flag' . "\n" .
-                                            '/interface wireless print where name=wlan1';
-                                    foreach (explode("\n", $fixB) as $l) {
-                                        if (str_starts_with(trim($l), '#')) {
-                                            echo '<span class="cmd-comment">' . htmlspecialchars($l) . '</span>' . "\n";
-                                        } elseif (trim($l) === '') {
-                                            echo "\n";
-                                        } else {
-                                            echo '<span class="cmd-prompt">$ </span>' . htmlspecialchars($l) . "\n";
-                                        }
-                                    }
-                                ?></div>
-                            </div>
-                            <textarea id="fix-b" class="d-none" readonly>/interface wireless set wlan1 mode=ap-bridge disabled=no ssid="Inovatech WiFi"
-/interface wireless print where name=wlan1</textarea>
-                            <button class="btn btn-sm btn-outline-primary mt-2" onclick="copyText('fix-b', this)">
-                                <i class="material-icons align-middle" style="font-size:.85rem">content_copy</i> Copy Fix B
-                            </button>
-                        </div>
-
-                        <!-- Fix C -->
-                                                <!-- Fix C -->
-                        <div class="fix-cmd-block">
-                            <span class="fix-tag fix-tag-c">
-                                <i class="material-icons" style="font-size:.8rem">dns</i>
-                                Fix C — IP → Hotspot shows no server or profile
-                            </span>
-                            <p class="small text-muted mb-2">
-                                Run this complete fix if hotspot is not working after provisioning.
-                                It creates both the profile and server in the correct order.
-                            </p>
-                            <div class="terminal-block position-relative">
-                                <div class="terminal-topbar">
-                                    <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-                                    <span class="terminal-label">Complete Hotspot Fix (Profile + Server)</span>
-                                </div>
-                                <div class="terminal-body" id="fix-c-display"><?php
-                                    $fixCComplete = '# === COMPLETE HOTSPOT FIX ===
-# Run this if hotspot is not working after provisioning
-
-# 1. Create profile if missing
-:local profileExists [/ip hotspot profile find name="inovatech-profile"]
-:if ([:len $profileExists] = 0) do={
-    /ip hotspot profile add name=inovatech-profile hotspot-address=192.168.50.1 login-by=http-chap,cookie
-    /ip hotspot profile set [find name=inovatech-profile] dns-name=hotspot.inovatech.co.ke http-cookie-lifetime=1d comment="inovatech-hotspot"
-    :put "✓ Profile created"
-} else={
-    :put "✓ Profile already exists"
-}
-
-# 2. Create hotspot server if missing
-:local serverExists [/ip hotspot find name="hotspot1"]
-:if ([:len $serverExists] = 0) do={
-    /ip hotspot add name=hotspot1 interface=bridge address-pool=hotspot_pool profile=inovatech-profile disabled=no
-    :put "✓ Hotspot server created"
-} else={
-    # Ensure correct settings
-    /ip hotspot set [find name=hotspot1] address-pool=hotspot_pool profile=inovatech-profile disabled=no
-    :put "✓ Hotspot server updated"
-}
-
-# 3. Verify
-:put "=== VERIFICATION ==="
-/ip hotspot print
-/ip hotspot profile print where name=inovatech-profile';
-                                    foreach (explode("\n", $fixCComplete) as $l) {
-                                        if (str_starts_with(trim($l), '#')) {
-                                            echo '<span class="cmd-comment">' . htmlspecialchars($l) . '</span>' . "\n";
-                                        } elseif (trim($l) === '') {
-                                            echo "\n";
-                                        } elseif (str_starts_with(trim($l), ':')) {
-                                            echo '<span class="cmd-prompt">$ </span><span style="color:#cba6f7">' . htmlspecialchars($l) . '</span>' . "\n";
-                                        } else {
-                                            echo '<span class="cmd-prompt">$ </span>' . htmlspecialchars($l) . "\n";
-                                        }
-                                    }
-                                ?></div>
-                            </div>
-                            <textarea id="fix-c-complete" class="d-none" readonly><?php 
-                                $fixCComplete = '/ip hotspot profile add name=inovatech-profile hotspot-address=192.168.50.1 login-by=http-chap,cookie
-/ip hotspot profile set [find name=inovatech-profile] dns-name=hotspot.inovatech.co.ke http-cookie-lifetime=1d comment="inovatech-hotspot"
-/ip hotspot add name=hotspot1 interface=bridge address-pool=hotspot_pool profile=inovatech-profile disabled=no
-/ip hotspot print
-/ip hotspot profile print where name=inovatech-profile';
-                                echo htmlspecialchars($fixCComplete);
-                            ?></textarea>
-                            <button class="btn btn-sm btn-outline-success mt-2" onclick="copyText('fix-c-complete', this)">
-                                <i class="material-icons align-middle" style="font-size:.85rem">content_copy</i> Copy Complete Fix
-                            </button>
-                        </div>
-
-                        <div class="alert alert-secondary d-flex align-items-start gap-2 py-2 mb-0">
-                            <i class="material-icons mt-1" style="font-size:1rem">lightbulb</i>
-                            <div class="small">
-                                <strong>Tip:</strong> After applying fixes, test by connecting a device to <strong>Inovatech WiFi</strong> — 
-                                it should redirect to the captive portal on first HTTP request. 
-                                Wired LAN clients (ether2–5) should receive a <code>192.168.50.x</code> IP and have internet.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ════════════════════════════════════════════════════════
+                <!-- ════════════════════════════════════════════════════
                      STEP 7 — Upload hotspot login page
-                ════════════════════════════════════════════════════════ -->
+                ════════════════════════════════════════════════════ -->
                 <div class="step-card step-upload" id="uploadCard" style="opacity:.5;pointer-events:none">
                     <div class="step-header">
                         <span class="step-num">7</span>
@@ -708,7 +519,7 @@ $fix_commands = implode("\n", [
                     </div>
                 </div>
 
-                <!-- ── Footer actions ─────────────────────────────────── -->
+                <!-- ── Footer actions ─────────────────────────────── -->
                 <div class="d-flex gap-2 mt-3 mb-5">
                     <a href="../routers" class="btn btn-primary">
                         <i class="material-icons align-middle me-1" style="font-size:1rem">arrow_back</i>
@@ -729,7 +540,7 @@ $fix_commands = implode("\n", [
 <?php require_once "../partials/scripts.php"; ?>
 <script>
 const ROUTER_ID = '<?= $router['router_id'] ?>';
-const stepMap   = { hotspot: 0, pppoe: 1, firewall: 2 };
+const stepMap   = { hotspot: 0, firewall: 1, dns: 2 };
 
 function runProvision() {
     const btn    = document.getElementById('provisionBtn');
