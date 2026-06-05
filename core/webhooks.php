@@ -119,8 +119,11 @@ $receipt        = null;
 $phone          = null;
 
 if ($provider === 'pesaflux') {
-    $transaction_id = $data['TransactionID'] ?? null;
+    $transaction_id = $data['TransactionID']    ?? null;
+    $receipt        = $data['TransactionReceipt'] ?? null;
+    $phone          = $data['Msisdn']            ?? null;
     $status         = ($data['ResponseCode'] ?? 1) == 0 ? 'SUCCESS' : 'FAILED';
+    logMsg("pesaflux", "TX: $transaction_id | Receipt: $receipt | Phone: $phone | Code: " . ($data['ResponseCode'] ?? 'n/a') . " | Status: $status");
 }
 
 if ($provider === 'mpesa') {
@@ -138,7 +141,6 @@ if ($provider === 'mpesa') {
 }
 
 if ($provider === 'intasend') {
-
     $state          = strtoupper($data['state'] ?? '');
     $transaction_id = $data['invoice_id'] ?? null;
     $receipt        = $data['invoice_id'] ?? null;
@@ -147,7 +149,6 @@ if ($provider === 'intasend') {
 
     logMsg("intasend", "invoice_id: $transaction_id | state: $state | phone: $phone | status: $status");
 
-    // Skip intermediate states — don't touch the DB, just acknowledge
     if (in_array($state, ['PENDING', 'PROCESSING'])) {
         logMsg("intasend", "Intermediate state ($state) — skipping DB update");
         exit("OK");
@@ -195,13 +196,27 @@ try {
     }
 
     /* FAILED / CANCELLED PAYMENT */
+    /* FAILED / CANCELLED PAYMENT */
     if ($status !== 'SUCCESS') {
-        $terminalFail = in_array(strtoupper($data['state'] ?? ''), ['FAILED', 'CANCELLED']);
-        if ($terminalFail) {
+        $isTerminal = false;
+
+        if ($provider === 'pesaflux') {
+            $isTerminal = true; // all non-zero codes are terminal
+            logMsg("pesaflux", "Failed payment | Code: " . ($data['ResponseCode'] ?? 'n/a') . " | Desc: " . ($data['ResponseDescription'] ?? 'n/a'));
+        } elseif ($provider === 'mpesa') {
+            $isTerminal = true; // STK callbacks are always terminal
+            logMsg("mpesa", "Failed payment | ResultCode: " . ($data['Body']['stkCallback']['ResultCode'] ?? 'n/a'));
+        } elseif ($provider === 'intasend') {
+            $isTerminal = in_array(strtoupper($data['state'] ?? ''), ['FAILED', 'CANCELLED']);
+            logMsg("intasend", "Failed payment | state: " . ($data['state'] ?? 'n/a') . " | reason: " . ($data['failed_reason'] ?? 'n/a'));
+        }
+
+        if ($isTerminal) {
             $pdo->prepare("UPDATE payments SET status='failed' WHERE payment_id=?")
                 ->execute([$payment['payment_id']]);
-            logMsg("intasend", "Payment marked failed: $transaction_id | reason: " . ($data['failed_reason'] ?? 'unknown'));
+            logMsg("webhook", "Payment marked failed: $transaction_id | provider: $provider");
         }
+
         $pdo->commit();
         exit("Payment not successful");
     }

@@ -203,11 +203,12 @@ if (!empty($user)) {
 ========================= */
 try {
   $stmt = $pdo->prepare("
-        SELECT * FROM hotspot_profiles
-        WHERE router_id=? 
-        AND plan_type='hotspot'
-        ORDER BY CAST(price AS UNSIGNED) ASC;
-    ");
+    SELECT * FROM hotspot_profiles
+    WHERE router_id=? 
+    AND plan_type='hotspot'
+    AND CAST(price AS DECIMAL(10,2)) < 1000
+    ORDER BY CAST(price AS UNSIGNED) ASC;
+");
   $stmt->execute([$router['router_id']]);
   $plans = $stmt->fetchAll();
 
@@ -2092,17 +2093,25 @@ $formatted_phone = formatPhone($support_phone);
       arc.style.strokeDashoffset = '0';
       timeEl.style.color = 'var(--text)';
       timeEl.textContent = '1:00';
+
       arcTimer = setInterval(() => {
         arcElapsed++;
         const rem = TOTAL_SECS - arcElapsed;
+
         if (rem <= 0) {
           clearInterval(arcTimer);
+          clearInterval(checkInterval);
+          checkInterval = null;
+          document.getElementById('stkWaiting').style.display = 'none';
+          showError('Payment timed out. Please check your M-Pesa and try again.');
           return;
         }
+
         const m = Math.floor(rem / 60),
           s = rem % 60;
         timeEl.textContent = m + ':' + String(s).padStart(2, '0');
         arc.style.strokeDashoffset = ((arcElapsed / TOTAL_SECS) * ARC_CIRC).toFixed(2);
+
         if (rem <= 15) {
           arc.className = 'arc-fill danger';
           timeEl.style.color = 'var(--danger)';
@@ -2110,6 +2119,7 @@ $formatted_phone = formatPhone($support_phone);
           arc.className = 'arc-fill warn';
           timeEl.style.color = 'var(--warning)';
         }
+
         document.getElementById('tickerMsg').textContent = HINTS[Math.floor(arcElapsed / 15) % HINTS.length];
       }, 1000);
     }
@@ -2207,19 +2217,25 @@ $formatted_phone = formatPhone($support_phone);
           const response = await fetch('payment_status.php');
           const status = await response.text();
 
-          if (status === 'ACTIVE') {
+          if (status.trim() === 'ACTIVE') {
             clearInterval(checkInterval);
+            checkInterval = null;
             stopArc();
             document.getElementById('stkWaiting').style.display = 'none';
             document.getElementById('successState').style.display = 'block';
             setTimeout(() => {
               window.location.href = 'create.php';
             }, 2000);
-          } else if (status.includes('FAILED') || status.includes('CANCELLED')) {
+
+          } else if (status.trim() === 'FAILED') {
             clearInterval(checkInterval);
+            checkInterval = null;
             stopArc();
+            document.getElementById('stkWaiting').style.display = 'none';
             showError('Payment was cancelled or failed. Please try again.');
           }
+          // PENDING — do nothing, keep polling
+
         } catch (error) {
           console.error('Status check error:', error);
         }

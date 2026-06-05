@@ -144,7 +144,7 @@ function send_invoice_email(string $email, string $name, array $invoice): bool
     $gatewayFee  = $invoice['gateway_fee'] > 0 ? 'KES ' . number_format($invoice['gateway_fee'], 2) : '—';
     $total       = 'KES ' . number_format($invoice['total_amount'], 2);
     $dueDate     = date('M d, Y', strtotime($invoice['period_end'] . ' +7 days'));
-    $dashLink    = 'https://billing.inovatech.co.ke/subscriptions/index';
+    $dashLink    = 'https://billing.inovatech.co.ke/subscription/index';
 
     $inner = "
         <p style='margin:0 0 16px;color:#555555;font-size:15px;line-height:1.6;'>
@@ -207,7 +207,7 @@ function send_invoice_email(string $email, string $name, array $invoice): bool
  */
 function send_suspension_email(string $email, string $name, string $invoiceNo, string $totalDue): bool
 {
-    $dashLink = 'https://billing.inovatech.co.ke/subscriptions/index';
+    $dashLink = 'https://billing.inovatech.co.ke/subscription/index';
 
     $inner = "
         <p style='margin:0 0 16px;color:#555;font-size:15px;line-height:1.6;'>
@@ -248,7 +248,7 @@ function send_suspension_email(string $email, string $name, string $invoiceNo, s
  */
 function send_trial_expiry_email(string $email, string $name, string $expiryDate): bool
 {
-    $dashLink = 'https://billing.inovatech.co.ke/subscriptions/index';
+    $dashLink = 'https://billing.inovatech.co.ke/subscription/index';
 
     $inner = "
         <p style='margin:0 0 16px;color:#555;font-size:15px;line-height:1.6;'>
@@ -285,7 +285,7 @@ function send_trial_expiry_email(string $email, string $name, string $expiryDate
  */
 function send_trial_expired_email(string $email, string $name): bool
 {
-    $dashLink = 'https://billing.inovatech.co.ke/subscriptions/index';
+    $dashLink = 'https://billing.inovatech.co.ke/subscription/index';
 
     $inner = "
         <p style='margin:0 0 16px;color:#555;font-size:15px;line-height:1.6;'>
@@ -321,7 +321,7 @@ function send_payment_confirmation_email(string $email, string $name, array $inv
     $period     = date('F Y', strtotime($invoice['period_start']));
     $total      = 'KES ' . number_format($invoice['total_amount'], 2);
     $paidAt     = date('M d, Y H:i', strtotime($invoice['paid_at'] ?? 'now'));
-    $dashLink   = 'https://billing.inovatech.co.ke/subscriptions/index';
+    $dashLink   = 'https://billing.inovatech.co.ke/subscription/index';
 
     $inner = "
         <p style='margin:0 0 20px;color:#555;font-size:15px;line-height:1.6;'>

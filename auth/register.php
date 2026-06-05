@@ -35,19 +35,22 @@ require_once "../partials/head.php";
                                             <!-- Flash messages -->
                                             <?php if (isset($_SESSION['error'])): ?>
                                                 <div class="alert alert-danger">
-                                                    <?= $_SESSION['error']; unset($_SESSION['error']); ?>
+                                                    <?= $_SESSION['error'];
+                                                    unset($_SESSION['error']); ?>
                                                 </div>
                                             <?php endif; ?>
 
                                             <?php if (isset($_SESSION['success'])): ?>
                                                 <div class="alert alert-success">
-                                                    <?= $_SESSION['success']; unset($_SESSION['success']); ?>
+                                                    <?= $_SESSION['success'];
+                                                    unset($_SESSION['success']); ?>
                                                 </div>
                                             <?php endif; ?>
 
                                             <?php if (isset($_SESSION['warning'])): ?>
                                                 <div class="alert alert-warning">
-                                                    <?= $_SESSION['warning']; unset($_SESSION['warning']); ?>
+                                                    <?= $_SESSION['warning'];
+                                                    unset($_SESSION['warning']); ?>
                                                 </div>
                                             <?php endif; ?>
 
@@ -73,12 +76,26 @@ require_once "../partials/head.php";
                                                 </div>
 
                                                 <div class="mb-4">
-                                                    <input type="password" name="password" id="password" class="form-control" placeholder="Password">
+                                                    <div class="input-group">
+                                                        <input type="password" name="password" id="password" class="form-control" placeholder="Password">
+                                                        <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('password', this)" tabindex="-1">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                                                                <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
                                                     <small id="passwordMsg"></small>
                                                 </div>
 
                                                 <div class="mb-4">
-                                                    <input type="password" name="confirm_password" class="form-control" placeholder="Confirm Password" required>
+                                                    <div class="input-group">
+                                                        <input type="password" name="confirm_password" id="confirmPassword" class="form-control" placeholder="Confirm Password" required>
+                                                        <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('confirmPassword', this)" tabindex="-1">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                                                                <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
                                                 </div>
 
                                                 <div class="d-flex align-items-center justify-content-between mt-4">
@@ -160,7 +177,10 @@ require_once "../partials/head.php";
             if (/[A-Z]/.test(value)) strength++;
             if (/[0-9]/.test(value)) strength++;
             if (/[^A-Za-z0-9]/.test(value)) strength++;
-            if (value.length === 0) { msg.innerHTML = ""; return; }
+            if (value.length === 0) {
+                msg.innerHTML = "";
+                return;
+            }
             if (strength <= 1) {
                 msg.innerHTML = "Weak password";
                 msg.style.color = "red";
@@ -173,9 +193,15 @@ require_once "../partials/head.php";
             }
         }
 
-        document.getElementById("username").addEventListener("keyup", function() { checkUsername(this.value); });
-        document.getElementById("email").addEventListener("keyup", function() { checkEmail(this.value); });
-        document.getElementById("password").addEventListener("keyup", function() { checkPassword(this.value); });
+        document.getElementById("username").addEventListener("keyup", function() {
+            checkUsername(this.value);
+        });
+        document.getElementById("email").addEventListener("keyup", function() {
+            checkEmail(this.value);
+        });
+        document.getElementById("password").addEventListener("keyup", function() {
+            checkPassword(this.value);
+        });
     </script>
 </body>
 

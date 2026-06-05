@@ -6,6 +6,8 @@ require_once "../assets/TCPDF/tcpdf.php";
 if (!is_logged_in()) exit("Unauthorized");
 
 // $routerIds is already set by auth.php
+/** @var array $routerIds Injected by auth.php */
+$routerIds = $routerIds ?? [0]; // satisfies Intelephense + guards against edge case
 $routerPlaceholders = implode(',', array_fill(0, count($routerIds), '?'));
 
 /* ── DATE FILTER ─────────────────────────────────────────────────── */

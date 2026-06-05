@@ -6,7 +6,7 @@
                 <input type="hidden" name="action" value="create">
                 
                 <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">
+                    <h5 class="modal-title text-white">
                         <i class="fa fa-plus-circle me-2"></i>Add New Package
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -82,6 +82,14 @@
                             <small class="text-muted">Package duration in days</small>
                         </div>
 
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                <i class="fa fa-clock me-1"></i>Validity (Hours)
+                            </label>
+                            <input name="validity_hours" type="number" class="form-control" placeholder="0">
+                            <small class="text-muted">Additional hours (optional)</small>
+                        </div>
+
                         <div class="col-12">
                             <div class="alert alert-info mb-0">
                                 <i class="fa fa-info-circle me-2"></i>
@@ -114,7 +122,7 @@
         <div class="modal-content">
 
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">
+                <h5 class="modal-title text-white">
                     <i class="fa fa-eye me-2"></i>Profile Details
                 </h5>
                 <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -215,7 +223,7 @@
                 <input type="hidden" name="profile_type" id="edit-type">
 
                 <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">
+                    <h5 class="modal-title text-white">
                         <i class="fa fa-edit me-2"></i>Edit Profile
                     </h5>
                     <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -247,7 +255,6 @@
                             <input name="price" id="edit-price" type="number" step="0.01" class="form-control">
                         </div>
 
-                        
                         <div class="col-md-6">
                             <label class="form-label">
                                 <i class="fa fa-clock me-1"></i>Validity Hrs
@@ -255,6 +262,7 @@
                             <input name="validity_hours" id="edit-validity-hours" class="form-control" placeholder="e.g., 30d 0h">
                             <small class="text-muted">Format: hours</small>
                         </div>
+
                         <div class="col-md-6">
                             <label class="form-label">
                                 <i class="fa fa-clock me-1"></i>Validity Days
@@ -301,7 +309,7 @@
                 <input type="hidden" name="profile_type" id="delete-type">
 
                 <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title">
+                    <h5 class="modal-title text-white">
                         <i class="fa fa-exclamation-triangle me-2"></i>Delete Profile
                     </h5>
                     <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>

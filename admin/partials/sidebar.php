@@ -102,9 +102,9 @@ function adminIsCollapsed(array $paths): string {
                 </a>
                 <div class="collapse <?= adminIsShow(['/admin/invoices', '/admin/billing']) ?>" id="collapseBilling">
                     <nav class="drawer-menu-nested nav flex-column">
-                        <a class="nav-link <?= adminIsActive('/admin/invoices/platform') ?>" href="../../admin/invoices/platform">Platform Invoices</a>
-                        <a class="nav-link <?= adminIsActive('/admin/invoices/gateway') ?>" href="../../admin/invoices/gateway">Gateway Invoices</a>
-                        <a class="nav-link <?= adminIsActive('/admin/invoices/overdue') ?>" href="../../admin/invoices/overdue">Overdue</a>
+                        <a class="nav-link <?= adminIsActive('/admin/invoices/index?tab=platform&status=&month=0&q=') ?>" href="../../admin/invoices/index?tab=platform&status=&month=0&q=">Platform Invoices</a>
+                        <a class="nav-link <?= adminIsActive('/admin/invoices/index?tab=gateway&status=&month=0&q=') ?>" href="../../admin/invoices/index?tab=gateway&status=&month=0&q=">Gateway Invoices</a>
+                        <a class="nav-link <?= adminIsActive('/admin/invoices/index?tab=gateway&q=&status=overdue&month=') ?>" href="../../admin/invoices/index?tab=gateway&q=&status=overdue&month=">Overdue</a>
                     </nav>
                 </div>
 

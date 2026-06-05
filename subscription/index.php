@@ -1,4 +1,5 @@
 <?php
+//user/subscription/index.php
 require_once "../core/db.php";
 require_once "../core/auth.php";
 require_once "../core/app.php";

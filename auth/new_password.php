@@ -29,7 +29,8 @@ $token = $_GET['token'] ?? '';
 
                                             <?php if (isset($_SESSION['error'])): ?>
                                                 <div class="alert alert-danger">
-                                                    <?= $_SESSION['error']; unset($_SESSION['error']); ?>
+                                                    <?= $_SESSION['error'];
+                                                    unset($_SESSION['error']); ?>
                                                 </div>
                                             <?php endif; ?>
 
@@ -39,11 +40,25 @@ $token = $_GET['token'] ?? '';
                                                 <input type="hidden" name="token" value="<?= htmlspecialchars($token) ?>">
 
                                                 <div class="mb-4">
-                                                    <input type="password" name="password" class="form-control" placeholder="New Password" required>
+                                                    <div class="input-group">
+                                                        <input type="password" name="password" id="newPassword" class="form-control" placeholder="New Password" required>
+                                                        <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('newPassword', this)" tabindex="-1">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                                                                <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
                                                 </div>
 
                                                 <div class="mb-4">
-                                                    <input type="password" name="confirm_password" class="form-control" placeholder="Confirm Password" required>
+                                                    <div class="input-group">
+                                                        <input type="password" name="confirm_password" id="confirmNewPassword" class="form-control" placeholder="Confirm Password" required>
+                                                        <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('confirmNewPassword', this)" tabindex="-1">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                                                                <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
                                                 </div>
 
                                                 <div class="d-flex align-items-center justify-content-between mt-4">
